@@ -1,0 +1,35 @@
+/* JobListings.css */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 15px;
+}
+
+.job-cards-container {
+  max-width: 100%;
+}
+
+.dropdown-menu {
+  min-width: 8rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ms-md-4 {
+    margin-left: 0 !important;
+  }
+  
+  .container {
+    padding: 0 10px;
+  }
+}
+
+/* Ensure the filter sticks to the top on mobile */
+@media (max-width: 991px) {
+  .col-lg-3 {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: white;
+  }
+} 
