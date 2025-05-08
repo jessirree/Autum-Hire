@@ -36,11 +36,14 @@ export default function HomePage() {
       <div
         className="text-white d-flex flex-column justify-content-center align-items-center w-100"
         style={{
-          backgroundImage: `url('/public/bg3.jpeg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          height: '60vh',
+          backgroundImage: `url(/background.png)`,
+          backgroundSize: '100%',
+          backgroundPosition: 'center 30%',
+          backgroundRepeat: 'no-repeat',
+          height: '70vh',
           width: '100vw',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backgroundBlendMode: 'overlay'
         }}
       >
         <div style={{ width: '100%', backgroundColor: 'rgba(0,0,0,0.5)', padding: '2rem' }}>

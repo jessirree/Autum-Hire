@@ -1,30 +1,30 @@
 // src/components/Navbar.tsx
+import React from "react";
+import { Navbar, Nav, Button, Container } from "react-bootstrap";
 import { Link } from "react-router-dom";
 
-export default function Navbar() {
+const CustomNavbar: React.FC = () => {
   return (
-    <nav className="navbar navbar-expand-lg bg-white border-bottom px-4 py-2">
-      <div className="container-fluid">
-        <Link to="/" className="navbar-brand fw-bold">
-          <span className="text-danger">Autum</span><span className="text-success">hire</span>
-        </Link>
-        <div className="collapse navbar-collapse justify-content-end">
-          <ul className="navbar-nav">
-            <li className="nav-item">
-              <Link to="/jobs" className="nav-link fw-semibold">Job Listings</Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/post-job" className="nav-link fw-semibold">Post a Job</Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/about" className="nav-link fw-semibold">About us</Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/login" className="btn btn-warning fw-semibold ms-3">Log In</Link>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
+    <Navbar bg="light" expand="lg" className="py-3 shadow-sm">
+      <Container>
+        <Navbar.Brand as={Link} to="/" className="fw-bold">
+          <span style={{ color: "orangered" }}>Autum</span>
+          <span style={{ color: "darkgreen" }}>hire</span>
+        </Navbar.Brand>
+        <Navbar.Toggle aria-controls="navbar-nav" />
+        <Navbar.Collapse id="navbar-nav">
+          <Nav className="ms-auto align-items-center">
+            <Nav.Link as={Link} to="/jobs" className="mx-2">Job Listings</Nav.Link>
+            <Nav.Link as={Link} to="/post-job" className="mx-2">Post a Job</Nav.Link>
+            <Nav.Link as={Link} to="/about" className="mx-2">About us</Nav.Link>
+            <Link to="/login" className="text-decoration-none">
+              <Button variant="warning" className="ms-3 px-4">Log In</Button>
+            </Link>
+          </Nav>
+        </Navbar.Collapse>
+      </Container>
+    </Navbar>
   );
-}
+};
+
+export default CustomNavbar;
