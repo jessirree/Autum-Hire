@@ -36,7 +36,7 @@ export default function HomePage() {
       <div
         className="text-white d-flex flex-column justify-content-center align-items-center w-100"
         style={{
-          backgroundImage: `url(/background.png)`,
+          backgroundImage: `url(${import.meta.env.BASE_URL}background.png)`,
           backgroundSize: '100%',
           backgroundPosition: 'center 30%',
           backgroundRepeat: 'no-repeat',
