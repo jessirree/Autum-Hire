@@ -6,7 +6,7 @@ import AboutUs from './pages/AboutUs';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/Autum-Hire">
       <Navbar />
       <Routes>
         <Route path="/" element={<HomePage />} />
