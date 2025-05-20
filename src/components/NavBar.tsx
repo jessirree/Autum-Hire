@@ -2,10 +2,15 @@
 import React from "react";
 import { Navbar, Nav, Button, Container } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import "./NavBar.css";
 
 const CustomNavbar: React.FC = () => {
   return (
-    <Navbar bg="light" expand="lg" className="py-3 shadow-sm">
+    <Navbar
+      expand="lg"
+      className="py-3 shadow-sm custom-navbar"
+      style={{ position: "sticky", top: 0, zIndex: 1000 }}
+    >
       <Container>
         <Navbar.Brand as={Link} to="/" className="fw-bold">
           <span style={{ color: "orangered" }}>Autum</span>
@@ -14,6 +19,7 @@ const CustomNavbar: React.FC = () => {
         <Navbar.Toggle aria-controls="navbar-nav" />
         <Navbar.Collapse id="navbar-nav">
           <Nav className="ms-auto align-items-center">
+            <Nav.Link as={Link} to="/" className="mx-2">Home</Nav.Link>
             <Nav.Link as={Link} to="/jobs" className="mx-2">Job Listings</Nav.Link>
             <Nav.Link as={Link} to="/post-job" className="mx-2">Post a Job</Nav.Link>
             <Nav.Link as={Link} to="/about" className="mx-2">About us</Nav.Link>

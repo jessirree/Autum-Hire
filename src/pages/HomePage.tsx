@@ -34,37 +34,55 @@ export default function HomePage() {
     <div style={{ width: '100vw', overflowX: 'hidden' }}>
       {/* Hero Section */}
       <div
-        className="text-white d-flex flex-column justify-content-center align-items-center w-100"
+        className="d-flex flex-column justify-content-center align-items-center w-100 position-relative"
         style={{
-          backgroundImage: `url(${import.meta.env.BASE_URL}background.png)`,
+          backgroundImage: `url(${import.meta.env.BASE_URL}bg1.png)`,
           backgroundSize: '100%',
           backgroundPosition: 'center 30%',
           backgroundRepeat: 'no-repeat',
           height: '70vh',
           width: '100vw',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backgroundBlendMode: 'overlay'
+          overflow: 'hidden'
         }}
       >
-        <div style={{ width: '100%', backgroundColor: 'rgba(0,0,0,0.5)', padding: '2rem' }}>
-          <div className="container">
-            <h2 className="fw-bold text-center mb-4">FIND A JOB</h2>
-            <div className="row justify-content-center g-3">
-              <div className="col-sm-4">
-                <div className="input-group">   
-                  <span className="input-group-text"><FaSearch /></span>
-                  <input type="text" className="form-control" placeholder="Keywords" />
-                </div>
+        {/* Force placeholder color to white with inline style tag */}
+        <style>{`
+          .hero-section .form-control::placeholder,
+          .hero-section .form-control::-webkit-input-placeholder,
+          .hero-section .form-control::-moz-placeholder,
+          .hero-section .form-control:-ms-input-placeholder,
+          .hero-section .form-control::-ms-input-placeholder {
+            color: #fff !important;
+            opacity: 1 !important;
+          }
+        `}</style>
+        {/* Black overlay with 30% opacity */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 1
+        }} />
+        <div className="container text-center" style={{ position: 'relative', zIndex: 2 }}>
+          <h2 className="fw-bold mb-4" style={{ fontSize: '3rem', color: '#eae3d2' }}>FIND A JOB</h2>
+          <div className="row justify-content-center g-3">
+            <div className="col-sm-4">
+              <div className="input-group">
+                <span className="input-group-text" style={{ color: '#fff', background: 'transparent', border: '1px solid #fff' }}><FaSearch /></span>
+                <input type="text" className="form-control" placeholder="Keywords" style={{ color: '#222', background: 'rgba(234,227,210,0.6)', border: '1px solid #fff' }} />
               </div>
-              <div className="col-sm-4">
-                <div className="input-group">
-                  <span className="input-group-text"><FaSearchLocation /></span>
-                  <input type="text" className="form-control" placeholder="Location" />
-                </div>
+            </div>
+            <div className="col-sm-4">
+              <div className="input-group">
+                <span className="input-group-text" style={{ color: '#fff', background: 'transparent', border: '1px solid #fff' }}><FaSearchLocation /></span>
+                <input type="text" className="form-control" placeholder="Location" style={{ color: '#222', background: 'rgba(234,227,210,0.6)', border: '1px solid #fff' }} />
               </div>
-              <div className="col-sm-2">
-                <button className="btn btn-warning fw-bold w-100">Search</button>
-              </div>
+            </div>
+            <div className="col-sm-2">
+              <button className="btn login-btn fw-bold w-100">Search</button>
             </div>
           </div>
         </div>

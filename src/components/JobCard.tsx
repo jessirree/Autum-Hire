@@ -14,7 +14,7 @@ const JobCard: React.FC<JobCardProps> = ({
   type = "Full-time" 
 }) => {
   return (
-    <div className="bg-white text-center p-4 shadow-sm rounded h-100">
+    <div className="text-center p-4 shadow-sm rounded h-100" style={{ background: '#eae3d2' }}>
       <h5 className="fw-bold mb-3">{title}</h5>
       <div className="text-muted">
         <p className="mb-2">{company}</p>
@@ -22,7 +22,7 @@ const JobCard: React.FC<JobCardProps> = ({
         <p className="mb-2"><i className="fas fa-money-bill me-2"></i>{salary}</p>
         <p className="mb-0"><i className="fas fa-briefcase me-2"></i>{type}</p>
       </div>
-      <button className="btn btn-outline-warning mt-3 w-100">View Details</button>
+      <button className="btn login-btn w-100 mt-3">View Details</button>
     </div>
   );
 };

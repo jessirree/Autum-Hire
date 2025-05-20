@@ -27,10 +27,8 @@ const JobListingCard: React.FC<JobListingCardProps> = ({
           <h6 className="card-subtitle mb-2 text-muted">{companyName}</h6>
           <p className="card-text small mb-0">{details}</p>
         </div>
-        <div className="d-flex flex-column align-items-end">
-          <button className="btn btn-link bookmark-btn">
-            <i className="far fa-bookmark"></i>
-          </button>
+        <div className="d-flex flex-column align-items-end ms-3">
+          <button className="btn login-btn">View Details</button>
         </div>
       </div>
     </div>

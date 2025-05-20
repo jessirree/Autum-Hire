@@ -12,13 +12,10 @@ const AboutUs: React.FC = () => {
           <section className="mb-5">
             <h2 className="section-title">Who We Are</h2>
             <p className="section-content">
-              We are a dynamic online job listing platform dedicated to bridging the gap between job seekers and employers. 
-              Whether you're a recent graduate seeking your first role or a company looking to attract top talent, 
-              our platform is designed to make the hiring journey seamless, transparent, and efficient.
+            Autum hire is a proactive Human Resource Management consultancy firm specializing in Strategic Recruitment, learning and development systems and Team building. 
             </p>
             <p className="section-content">
-              Founded with the belief that everyone deserves access to meaningful employment, 
-              we strive to empower individuals and businesses alike through smart technology and user-focused features.
+            We champion the best Human Resource practice and integrate it with innovation and modern technology for the benefit of our clients. With Autum hire you can seamlessly source the best talent in the market, identifying future business needs and building a candidate talent pool for the future. 
             </p>
           </section>
 
@@ -28,8 +25,7 @@ const AboutUs: React.FC = () => {
               <div className="mission-vision-card">
                 <h2 className="section-title"> Our Mission</h2>
                 <p className="section-content">
-                  To connect job seekers with opportunities that match their skills, passions, 
-                  and career goals—while providing employers with a streamlined way to find qualified candidates.
+                To combine aggressive strategic talent acquisition with quality products and services through innovation and modern technology for the best talent acquisition value of consumers.
                 </p>
               </div>
             </div>
@@ -37,8 +33,7 @@ const AboutUs: React.FC = () => {
               <div className="mission-vision-card">
                 <h2 className="section-title"> Our Vision</h2>
                 <p className="section-content">
-                  To become the leading job-matching platform in our region, known for reliability, 
-                  ease of use, and the positive impact we create in the job market.
+                Talent acquisition practices into the global village through innovation and modern technology.
                 </p>
               </div>
             </div>
@@ -46,13 +41,11 @@ const AboutUs: React.FC = () => {
 
           {/* What We Offer Section */}
           <section className="mb-5">
-            <h2 className="section-title"> What We Offer</h2>
+            <h2 className="section-title"> Objectives </h2>
             <div className="offer-grid">
-              <div className="offer-item">A curated list of job openings across various industries.</div>
-              <div className="offer-item">Easy-to-use filters for skills, location, and job type.</div>
-              <div className="offer-item">Employer dashboards to manage listings and applications.</div>
-              <div className="offer-item">Real-time job alerts and updates for seekers.</div>
-              <div className="offer-item">A mobile-responsive, secure, and user-friendly experience.</div>
+              <div className="offer-item">To be a partner of choice in providing quality Talent acquisition practice </div>
+              <div className="offer-item">To advocate for the best Human Resource practice</div>
+              <div className="offer-item">To lead in the innovation and technology of Talent acquisition systems, tools and strategies </div>
             </div>
           </section>
 
@@ -60,28 +53,22 @@ const AboutUs: React.FC = () => {
           <section className="mb-5">
             <h2 className="section-title"> Our Core Values</h2>
             <div className="row">
-              <div className="col-md-6 col-lg-3 mb-4">
-                <div className="value-card">
-                  <h3>Transparency</h3>
-                  <p>We foster open, honest job listings with accurate information.</p>
-                </div>
-              </div>
-              <div className="col-md-6 col-lg-3 mb-4">
-                <div className="value-card">
-                  <h3>Accessibility</h3>
-                  <p>Our platform is inclusive and easy to navigate for all users.</p>
-                </div>
-              </div>
-              <div className="col-md-6 col-lg-3 mb-4">
-                <div className="value-card">
-                  <h3>Empowerment</h3>
-                  <p>We aim to uplift both individuals and organizations.</p>
-                </div>
-              </div>
-              <div className="col-md-6 col-lg-3 mb-4">
+              <div className="col-md-6 col-lg-4 mb-4">
                 <div className="value-card">
                   <h3>Innovation</h3>
                   <p>We continually improve to meet the evolving job market.</p>
+                </div>
+              </div>
+              <div className="col-md-6 col-lg-4 mb-4">
+                <div className="value-card">
+                  <h3>Integrity</h3>
+                  <p>We maintain the highest standards of honesty and ethics.</p>
+                </div>
+              </div>
+              <div className="col-md-6 col-lg-4 mb-4">
+                <div className="value-card">
+                  <h3>Excellence</h3>
+                  <p>We strive for excellence in everything we do.</p>
                 </div>
               </div>
             </div>

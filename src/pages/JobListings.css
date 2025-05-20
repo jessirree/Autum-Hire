@@ -3,6 +3,8 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 15px;
+  background: var(--background);
+  color: var(--primary-text);
 }
 
 .job-cards-container {
@@ -11,6 +13,25 @@
 
 .dropdown-menu {
   min-width: 8rem;
+  background: var(--background-alt);
+  color: var(--primary-text);
+}
+
+.dropdown-item:hover {
+  background: var(--button-hover);
+  color: var(--charcoal-gray);
+}
+
+.btn-outline-secondary {
+  background: #fff !important;
+  color: var(--charcoal-gray, #4A4A4A) !important;
+  border: 1px solid #ccc !important;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-outline-secondary:hover, .btn-outline-secondary:focus {
+  background: var(--golden-yellow, #F4A259) !important;
+  color: #fff !important;
+  border: 1px solid var(--golden-yellow, #F4A259) !important;
 }
 
 /* Responsive adjustments */
@@ -30,6 +51,6 @@
     position: sticky;
     top: 0;
     z-index: 1000;
-    background: white;
+    background: var(--background);
   }
 } 
