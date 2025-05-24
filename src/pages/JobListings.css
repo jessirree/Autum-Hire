@@ -36,8 +36,19 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .ms-md-4 {
+  .job-cards-container {
+    padding: 0 !important;
+  }
+  .col-lg-3, .col-md-4, .col-lg-8, .col-md-7 {
+    width: 100% !important;
     margin-left: 0 !important;
+  }
+  .job-cards-container > div {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .dropdown-menu {
+    min-width: 100% !important;
   }
   
   .container {

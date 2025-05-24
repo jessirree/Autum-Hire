@@ -5,6 +5,7 @@ import type { User } from 'firebase/auth';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
+import './EmployerDashboard.css';
 
 interface Job {
   id: string;

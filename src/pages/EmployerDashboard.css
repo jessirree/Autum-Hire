@@ -1,0 +1,42 @@
+/* Responsive fixes for Employer Dashboard */
+
+.job-listing-card {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.job-listing-card .d-flex.align-items-center {
+  flex-wrap: wrap;
+}
+
+.job-listing-card img {
+  max-width: 60px;
+  height: auto;
+}
+
+.job-listing-card .d-flex.gap-2 {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .job-listing-card .d-flex.align-items-center {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .job-listing-card img {
+    margin-bottom: 1rem;
+    margin-right: 0 !important;
+  }
+  .job-listing-card .d-flex.gap-2 {
+    flex-direction: column;
+    width: 100%;
+    align-items: stretch;
+  }
+  .job-listing-card button,
+  .job-listing-card .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+}
