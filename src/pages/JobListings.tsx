@@ -169,17 +169,17 @@ const JobListings: React.FC = () => {
 
             {/* Job Listings Section */}
             <div className="col-lg-8 col-md-7 ms-md-4">
+              <div className="d-flex justify-content-end mb-4">
+                <button
+                  className="btn btn-outline-success d-flex align-items-center"
+                  style={{ gap: 8 }}
+                  onClick={() => navigate('/subscribe')}
+                >
+                  <FaBell className="me-2" /> Subscribe for Job Alerts
+                </button>
+              </div>
               <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4>Available Positions</h4>
-                <div className="d-flex align-items-center" style={{ gap: 12 }}>
-                  <button
-                    className="btn btn-outline-success d-flex align-items-center"
-                    style={{ gap: 8 }}
-                    onClick={() => navigate('/subscribe')}
-                  >
-                    <FaBell className="me-2" /> Subscribe for Job Alerts
-                  </button>
-                </div>
+                <h4>Available Positions</h4>
                 <Dropdown onSelect={handleSort}>
                   <Dropdown.Toggle variant="outline-secondary" id="sortDropdown">
                     Sort by: {sortBy}

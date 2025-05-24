@@ -117,8 +117,7 @@ export default function HomePage() {
       {/* Featured Jobs */}
       <div style={{ width: '100vw', backgroundColor: '#b3c2a3', position: 'relative' }} className="py-5">
         <div className="container position-relative">
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h4 className="mb-0">Featured Jobs</h4>
+          <div className="d-flex justify-content-end mb-4">
             <button
               className="btn btn-light d-flex align-items-center"
               style={{ gap: 8 }}
@@ -126,6 +125,9 @@ export default function HomePage() {
             >
               <FaBell className="me-2" /> Subscribe for Job Alerts
             </button>
+          </div>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h4 className="mb-0">Featured Jobs</h4>
           </div>
           <button
             className="btn btn-light position-absolute top-50 start-0 translate-middle-y"
