@@ -1,6 +1,6 @@
 // src/pages/HomePage.tsx
 import { FaSearch, FaChevronLeft, FaChevronRight, FaBell } from "react-icons/fa";
-import JobCard from '../components/JobCard';
+
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './HomePage.css';
 import { useNavigate } from 'react-router-dom';
