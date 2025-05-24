@@ -59,15 +59,15 @@ export default function HomePage() {
     <div style={{ width: '100vw', overflowX: 'hidden' }}>
       {/* Hero Section */}
       <div
-        className="d-flex flex-column justify-content-center align-items-center w-100 position-relative hero-section"
+        className="d-flex flex-column justify-content-center align-items-center w-100 position-relative"
         style={{
           backgroundImage: `url(${import.meta.env.BASE_URL}bg1.png)`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundSize: '100%',
+          backgroundPosition: 'center 30%',
           backgroundRepeat: 'no-repeat',
-          minHeight: '60vh',
-          width: '100%',
-          overflow: 'hidden',
+          height: '70vh',
+          width: '100vw',
+          overflow: 'hidden'
         }}
       >
         {/* Force placeholder color to white with inline style tag */}

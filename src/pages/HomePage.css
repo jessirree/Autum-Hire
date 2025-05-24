@@ -59,26 +59,6 @@ body {
     width: 90%;
     margin: 10px 0;
   }
-  .hero-section {
-    min-height: 40vh !important;
-    background-size: cover !important;
-    background-position: center !important;
-    width: 100vw !important;
-    padding: 2rem 0 1rem 0;
-  }
-  .hero-section h2 {
-    font-size: 2rem !important;
-  }
-  .hero-section .form-control {
-    font-size: 1rem !important;
-  }
-  .container.text-center {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-  .featured-jobs, .footer {
-    padding: 1em 0 !important;
-  }
 }
 
 .hero-section {
