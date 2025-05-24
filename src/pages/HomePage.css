@@ -26,7 +26,6 @@ body {
 }
 
 /* Remove any background from hero section children */
-.hero-section,
 .hero-section div,
 .container.text-center {
   background: none !important;
