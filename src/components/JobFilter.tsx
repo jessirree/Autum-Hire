@@ -14,6 +14,8 @@ const JobFilter: React.FC<JobFilterProps> = ({ onFilter }) => {
     organization: ''
   });
 
+  const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary'];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -98,14 +100,17 @@ const JobFilter: React.FC<JobFilterProps> = ({ onFilter }) => {
 
       <div className="mb-4">
         <label className="form-label">Contract type</label>
-        <input 
-          type="text" 
-          className="form-control" 
-          placeholder="e.g full time"
+        <select
+          className="form-select"
           name="contractType"
           value={filters.contractType}
           onChange={handleChange}
-        />
+        >
+          <option value="">Select contract type</option>
+          {jobTypes.map(type => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
       </div>
 
       <div className="mb-4">

@@ -1,0 +1,106 @@
+.pricing-container {
+  background-color: var(--background);
+  min-height: calc(100vh - 76px);
+}
+
+.pricing-card {
+  background-color: var(--card-bg);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.pricing-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.pricing-card.featured {
+  border: 2px solid var(--pumpkin-orange);
+  position: relative;
+}
+
+.popular-badge {
+  position: absolute;
+  top: 12px;
+  right: -30px;
+  background-color: var(--pumpkin-orange);
+  color: white;
+  padding: 4px 30px;
+  transform: rotate(45deg);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.price {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--forest-green);
+}
+
+.currency {
+  font-size: 1.5rem;
+  vertical-align: super;
+  margin-right: 4px;
+}
+
+.period {
+  font-size: 1rem;
+  color: var(--charcoal-gray);
+  font-weight: 400;
+}
+
+.features-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.features-list li {
+  padding: 8px 0;
+  color: var(--charcoal-gray);
+  position: relative;
+  padding-left: 24px;
+}
+
+.features-list li::before {
+  content: "✓";
+  color: var(--olive-green);
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+}
+
+.btn-outline-primary {
+  color: var(--pumpkin-orange) !important;
+  border-color: var(--pumpkin-orange) !important;
+  background-color: transparent !important;
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--pumpkin-orange) !important;
+  color: white !important;
+}
+
+.btn-primary {
+  background-color: var(--pumpkin-orange) !important;
+  border-color: var(--pumpkin-orange) !important;
+  color: white !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--golden-yellow) !important;
+  border-color: var(--golden-yellow) !important;
+  color: var(--charcoal-gray) !important;
+}
+
+@media (max-width: 768px) {
+  .pricing-container {
+    padding: 2rem 1rem;
+  }
+  
+  .pricing-card {
+    margin-bottom: 1.5rem;
+  }
+} 
