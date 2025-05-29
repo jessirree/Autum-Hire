@@ -64,7 +64,7 @@ const PostJob: React.FC = () => {
             <Card.Body className="d-flex flex-column">
               <Card.Title className="text-center mb-4">Free</Card.Title>
               <div className="price text-center mb-4">
-                <span className="currency">KES</span>
+                <span className="currency">USD</span>
                 <span className="amount">0</span>
                 <span className="period">/month</span>
               </div>
@@ -96,8 +96,8 @@ const PostJob: React.FC = () => {
               <div className="popular-badge">Most Popular</div>
               <Card.Title className="text-center mb-4">Standard</Card.Title>
               <div className="price text-center mb-4">
-                <span className="currency">KES</span>
-                <span className="amount">500</span>
+                <span className="currency">USD</span>
+                <span className="amount">75</span>
                 <span className="period">/month</span>
               </div>
               <ul className="features-list mb-4">
@@ -128,8 +128,8 @@ const PostJob: React.FC = () => {
             <Card.Body className="d-flex flex-column">
               <Card.Title className="text-center mb-4">Premium</Card.Title>
               <div className="price text-center mb-4">
-                <span className="currency">KES</span>
-                <span className="amount">999</span>
+                <span className="currency">USD</span>
+                <span className="amount">120</span>
                 <span className="period">/month</span>
               </div>
               <ul className="features-list mb-4">

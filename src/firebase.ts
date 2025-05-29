@@ -29,9 +29,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID
 };
 
-console.log("FIREBASE ENV:", import.meta.env);
-console.log("FIREBASE API KEY:", import.meta.env.VITE_FIREBASE_API_KEY);
-console.log("FIREBASE AUTH DOMAIN:", import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 
 // Prevent duplicate app initialization
 let app;
