@@ -124,15 +124,13 @@ const JobListings: React.FC = () => {
   const applySort = (jobs: any[]) => {
     let sorted = [...jobs];
     if (sortBy === 'Most Recent') {
-      // Sort by subscriptionType (premium > standard > free), then by most recent
+      // Sort by job.plan (premium > standard > free), then by most recent
       sorted.sort((a, b) => {
-        const companiesA = companies[a.postedBy] || {};
-        const companiesB = companies[b.postedBy] || {};
-        const usersA = String(companiesA.subscriptionType || a.subscriptionType || 'free');
-        const usersB = String(companiesB.subscriptionType || b.subscriptionType || 'free');
+        const aPlan = a.plan || 'free';
+        const bPlan = b.plan || 'free';
         const order: Record<string, number> = { premium: 0, standard: 1, free: 2 };
-        const subA = order[usersA as keyof typeof order] !== undefined ? order[usersA as keyof typeof order] : 3;
-        const subB = order[usersB as keyof typeof order] !== undefined ? order[usersB as keyof typeof order] : 3;
+        const subA = order[aPlan as keyof typeof order] !== undefined ? order[aPlan as keyof typeof order] : 3;
+        const subB = order[bPlan as keyof typeof order] !== undefined ? order[bPlan as keyof typeof order] : 3;
         if (subA !== subB) return subA - subB;
         const aDate = a.createdAt?.seconds || 0;
         const bDate = b.createdAt?.seconds || 0;
@@ -170,14 +168,14 @@ const JobListings: React.FC = () => {
             {/* Job Listings Section */}
             <div className="col-lg-8 col-md-7 ms-md-4">
               <div className="d-flex justify-content-end mb-4">
-                <button
-                  className="btn btn-outline-success d-flex align-items-center"
-                  style={{ gap: 8 }}
-                  onClick={() => navigate('/subscribe')}
-                >
-                  <FaBell className="me-2" /> Subscribe for Job Alerts
-                </button>
-              </div>
+                  <button
+                    className="btn btn-outline-success d-flex align-items-center"
+                    style={{ gap: 8 }}
+                    onClick={() => navigate('/subscribe')}
+                  >
+                    <FaBell className="me-2" /> Subscribe for Job Alerts
+                  </button>
+                </div>
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h4>Available Positions</h4>
                 <Dropdown onSelect={handleSort}>

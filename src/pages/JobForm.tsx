@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { collection, addDoc, setDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import dayjs from 'dayjs';
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary'];
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'INR', 'CAD', 'AUD', 'JPY', 'CNY'];
@@ -35,6 +36,7 @@ const JobForm: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'premium' | null>(null);
 
   useEffect(() => {
     // Auto-fill company details from Firestore
@@ -51,11 +53,21 @@ const JobForm: React.FC = () => {
       }
     };
     fetchCompany();
-    // eslint-disable-next-line
-  }, [user]);
+
+    const plan = sessionStorage.getItem('selectedPlan') as 'free' | 'standard' | 'premium' | null;
+    if (!plan) {
+      navigate('/post-job');
+    } else {
+      setSelectedPlan(plan);
+    }
+  }, [user, navigate]);
 
   if (!user) {
     return <Container className="py-5"><Alert variant="danger">You must be logged in to post a job.</Alert></Container>;
+  }
+
+  if (!selectedPlan) {
+    return null; // Or a loading spinner
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +93,13 @@ const JobForm: React.FC = () => {
 
       const companyData = companyDoc.data();
 
-      // Create job document
+      // Set deadline based on plan
+      let jobDeadline = deadline;
+      if (selectedPlan === 'free') {
+        jobDeadline = dayjs().add(15, 'day').toDate();
+      }
+
+      // Create job document with plan info
       const jobRef = await addDoc(collection(db, 'jobs'), {
         title,
         description,
@@ -89,15 +107,18 @@ const JobForm: React.FC = () => {
         salary: `${salaryCurrency} ${salary}`,
         jobType,
         experienceLevel,
-        deadline: deadline ? { seconds: Math.floor(deadline.getTime() / 1000) } : null,
+        deadline: jobDeadline ? { seconds: Math.floor(jobDeadline.getTime() / 1000) } : null,
         postedBy: user.uid,
         companyName: companyData.name,
         companyLogo: companyData.logoUrl || '/default_logo.png',
         createdAt: serverTimestamp(),
-        status: 'active'
+        status: 'active',
+        plan: selectedPlan,
+        paymentStatus: selectedPlan === 'free' ? 'not_required' : 'simulated_paid',
       });
 
       setSuccess('Job posted successfully!');
+      sessionStorage.removeItem('selectedPlan');
       
       // Redirect to dashboard after a short delay
       setTimeout(() => {
@@ -120,6 +141,14 @@ const JobForm: React.FC = () => {
       <Card className="shadow-sm">
         <Card.Body>
           <h2 className="text-center mb-4">Post a New Job</h2>
+          <Alert variant="info" className="mb-4 text-center">
+            <strong>Selected Plan:</strong> {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
+          </Alert>
+          {selectedPlan !== 'free' && (
+            <Alert variant="warning" className="mb-4 text-center">
+              <strong>Payment Simulation:</strong> This is a simulated payment for the {selectedPlan} plan. (No real payment required.)
+            </Alert>
+          )}
           
           {error && <Alert variant="danger">{error}</Alert>}
           {success && <Alert variant="success">{success}</Alert>}
@@ -150,7 +179,7 @@ const JobForm: React.FC = () => {
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Website</Form.Label>
-                  <Form.Control value={website} required />
+                  <Form.Control value={website} />
                 </Form.Group>
               </Col>
             </Row>

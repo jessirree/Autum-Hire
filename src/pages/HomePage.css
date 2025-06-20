@@ -72,9 +72,9 @@ body {
   border: 0;
   box-sizing: border-box;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Remove background from children, not the hero-section itself */
@@ -96,46 +96,46 @@ body {
   .hero-section .form-control {
     font-size: 1rem !important;
   }
-}
-
-.search-bar {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.search-bar input {
-  margin: 0 5px;
-  padding: 10px;
-  width: 200px;
-}
-
-.featured-jobs {
-  background-color: var(--background-alt);
-  padding: 50px 0;
-}
-
-.featured-jobs .container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.footer {
-  background-color: var(--background-dark);
-  color: white;
-  padding: 20px 0;
-  text-align: center;
-}
-
-.social-icons a {
-  color: white;
-  margin: 0 10px;
-}
-
-input:focus {
-  border-color: var(--button);
-  box-shadow: 0 0 0 0.2rem rgba(247, 108, 94, 0.25);
-}
+  }
+  
+  .search-bar {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  
+  .search-bar input {
+    margin: 0 5px;
+    padding: 10px;
+    width: 200px;
+  }
+  
+  .featured-jobs {
+    background-color: var(--background-alt);
+    padding: 50px 0;
+  }
+  
+  .featured-jobs .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .footer {
+    background-color: var(--background-dark);
+    color: white;
+    padding: 20px 0;
+    text-align: center;
+  }
+  
+  .social-icons a {
+    color: white;
+    margin: 0 10px;
+  }
+  
+  input:focus {
+    border-color: var(--button);
+    box-shadow: 0 0 0 0.2rem rgba(247, 108, 94, 0.25);
+  }
 
 /* Only keep the most specific rule for white placeholder in hero section at the bottom */
 .hero-section .form-control::placeholder,

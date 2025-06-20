@@ -10,48 +10,10 @@ const PostJob: React.FC = () => {
   const navigate = useNavigate();
   const auth = getAuth();
 
-  const handleSubscription = async (plan: 'free' | 'standard' | 'premium') => {
-    const user = auth.currentUser;
-    
-    if (!user) {
-      // Store the intended plan in sessionStorage
-      sessionStorage.setItem('intendedPlan', plan);
-      // Redirect to login
-      navigate('/auth');
-      return;
-    }
-
-    try {
-      // Update user's subscription in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-      
-      if (!userDoc.exists()) {
-        // Create user document if it doesn't exist
-        await setDoc(userRef, {
-          email: user.email,
-          subscriptionType: plan,
-          subscriptionDate: new Date().toISOString()
-        });
-      } else {
-        // Update existing user document
-        await setDoc(userRef, {
-          ...userDoc.data(),
-          subscriptionType: plan,
-          subscriptionDate: new Date().toISOString()
-        }, { merge: true });
-      }
-
-      // Redirect to dashboard with success message
-      navigate('/employer-dashboard', { 
-        state: { 
-          message: `You're now subscribed to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan!` 
-        }
-      });
-    } catch (error) {
-      console.error('Error updating subscription:', error);
-      // Handle error appropriately
-    }
+  const handlePlanSelect = (plan: 'free' | 'standard' | 'premium') => {
+    // Store selected plan in sessionStorage
+    sessionStorage.setItem('selectedPlan', plan);
+    navigate('/job-form');
   };
 
   return (
@@ -66,24 +28,24 @@ const PostJob: React.FC = () => {
               <div className="price text-center mb-4">
                 <span className="currency">USD</span>
                 <span className="amount">0</span>
-                <span className="period">/month</span>
+                <span className="period">/job</span>
               </div>
               <ul className="features-list mb-4">
                 <li>Post a job (listed normally)</li>
                 <li>Basic job listing</li>
                 <li>Standard visibility</li>
-                <li>30-day listing duration</li>
+                <li>15-day listing duration</li>
               </ul>
               <Button 
                 variant="primary" 
                 className="mt-auto"
-                onClick={() => handleSubscription('free')}
+                onClick={() => handlePlanSelect('free')}
                 style={{ 
                   backgroundColor: 'var(--pumpkin-orange)',
                   borderColor: 'var(--pumpkin-orange)'
                 }}
               >
-                Get Started
+                Use Free Plan
               </Button>
             </Card.Body>
           </Card>
@@ -98,7 +60,7 @@ const PostJob: React.FC = () => {
               <div className="price text-center mb-4">
                 <span className="currency">USD</span>
                 <span className="amount">75</span>
-                <span className="period">/month</span>
+                <span className="period">/job</span>
               </div>
               <ul className="features-list mb-4">
                 <li>All Free features</li>
@@ -110,13 +72,13 @@ const PostJob: React.FC = () => {
               <Button 
                 variant="primary" 
                 className="mt-auto"
-                onClick={() => handleSubscription('standard')}
+                onClick={() => handlePlanSelect('standard')}
                 style={{ 
                   backgroundColor: 'var(--pumpkin-orange)',
                   borderColor: 'var(--pumpkin-orange)'
                 }}
               >
-                Get Started
+                Use Standard Plan
               </Button>
             </Card.Body>
           </Card>
@@ -130,7 +92,7 @@ const PostJob: React.FC = () => {
               <div className="price text-center mb-4">
                 <span className="currency">USD</span>
                 <span className="amount">120</span>
-                <span className="period">/month</span>
+                <span className="period">/job</span>
               </div>
               <ul className="features-list mb-4">
                 <li>All Standard features</li>
@@ -142,13 +104,13 @@ const PostJob: React.FC = () => {
               <Button 
                 variant="primary" 
                 className="mt-auto"
-                onClick={() => handleSubscription('premium')}
+                onClick={() => handlePlanSelect('premium')}
                 style={{ 
                   backgroundColor: 'var(--pumpkin-orange)',
                   borderColor: 'var(--pumpkin-orange)'
                 }}
               >
-                Get Started
+                Use Premium Plan
               </Button>
             </Card.Body>
           </Card>

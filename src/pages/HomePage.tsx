@@ -18,21 +18,12 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchFeaturedJobs = async () => {
-      // Fetch users
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const premiumUserIds = new Set(
-        usersSnapshot.docs
-          .filter(doc => doc.data().subscriptionType === 'premium')
-          .map(doc => doc.id)
-      );
       // Fetch jobs
       const jobsSnapshot = await getDocs(collection(db, 'jobs'));
       const jobs: any[] = [];
       jobsSnapshot.forEach(doc => {
         const job: any = { id: doc.id, ...doc.data() };
-        if (premiumUserIds.has(job.postedBy)) {
           jobs.push(job);
-        }
       });
       setFeaturedJobs(jobs);
     };

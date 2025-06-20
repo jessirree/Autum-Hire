@@ -10,6 +10,10 @@ import PostJob from './pages/PostJob';
 import EmployerDashboard from './pages/EmployerDashboard';
 import JobListings from './pages/JobListings';
 import SubscribeForm from './pages/SubscribeForm';
+import TermsandConditions from './pages/TermsandConditions';
+import ContactUs from './pages/ContactUs';
+import AdminDashboard from './pages/AdminDashboard';
+import PaymentSim from './pages/payment-sim';
 import './App.css';
 
 // Protected Route component
@@ -57,6 +61,10 @@ const App: React.FC = () => {
             <Route path="/jobs" element={<JobListings />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/subscribe" element={<SubscribeForm />} />
+            <Route path="/terms" element={<TermsandConditions />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/payment-sim" element={<PaymentSim />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

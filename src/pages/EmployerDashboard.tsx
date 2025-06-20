@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Button, Card, Alert, Spinner, Collapse, Row, Col, Badge, Modal, Form } from 'react-bootstrap';
+import { Container, Button, Card, Alert, Spinner, Collapse, Row, Col, Badge, Modal, Form, Table } from 'react-bootstrap';
 import { getAuth, signOut } from 'firebase/auth';
-import type { User } from 'firebase/auth';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './EmployerDashboard.css';
 
@@ -18,12 +17,10 @@ interface Job {
   logoUrl?: string;
   companyLogo?: string;
   experienceLevel?: string;
+  postedBy: string;
 }
 
 interface UserData {
-  subscriptionType: 'free' | 'standard' | 'premium';
-  subscriptionDate: string;
-  subscriptionEndDate?: string;
   email: string;
 }
 
@@ -33,6 +30,13 @@ interface CompanyData {
   location: string;
   website: string;
   logoUrl: string;
+  phoneNumber?: string;
+}
+
+interface CompanyUser {
+  id: string;
+  email: string;
+  role: "super" | "normal";
 }
 
 const EmployerDashboard: React.FC = () => {
@@ -51,9 +55,24 @@ const EmployerDashboard: React.FC = () => {
     location.state?.message || null
   );
   const [showCompanyModal, setShowCompanyModal] = useState(false);
-  const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyData | null>(null);
+  const [showPlanModal, setShowPlanModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'premium'>('free');
+  const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
+  const [isSuperUser, setIsSuperUser] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [userManagementError, setUserManagementError] = useState("");
+
+  const fetchCompanyUsers = async (companyId: string) => {
+    const usersQuery = query(collection(db, "users"), where("companyId", "==", companyId));
+    const usersSnapshot = await getDocs(usersQuery);
+    const usersList = usersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as CompanyUser[];
+    setCompanyUsers(usersList);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -63,7 +82,12 @@ const EmployerDashboard: React.FC = () => {
         const userRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userRef);
         if (userDoc.exists()) {
-          setUserData(userDoc.data() as UserData);
+          const userData = userDoc.data() as UserData;
+          setUserData(userData);
+          if ((userData as any).role === "super") {
+            setIsSuperUser(true);
+            fetchCompanyUsers(user.uid);
+          }
         }
       } catch (err) {
         console.error('Error fetching user data:', err);
@@ -125,64 +149,56 @@ const EmployerDashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const canSendNotifications = userData?.subscriptionType === 'standard' || userData?.subscriptionType === 'premium';
-  const isFeatured = userData?.subscriptionType === 'premium';
-
   const handleCompanyEdit = () => {
+    if (!isSuperUser) return;
     setEditingCompany(companyData);
     setShowCompanyModal(true);
   };
 
-  const handlePlanEdit = () => {
-    setSelectedPlan(userData?.subscriptionType || 'free');
-    setShowPlanModal(true);
-  };
-
-  const handleCompanySave = async () => {
-    if (!user || !editingCompany) return;
-
-    try {
-      const companyRef = doc(db, 'companies', user.uid);
-      await updateDoc(companyRef, {
-        name: editingCompany.name,
-        industry: editingCompany.industry,
-        location: editingCompany.location,
-        website: editingCompany.website,
-        logoUrl: editingCompany.logoUrl
-      });
-      setCompanyData(editingCompany);
-      setShowCompanyModal(false);
-    } catch (err) {
-      setError('Failed to update company details.');
+  const handlePlanConfirm = () => {
+    sessionStorage.setItem('selectedPlan', selectedPlan);
+    setShowPlanModal(false);
+    if (selectedPlan === 'free') {
+      navigate('/job-form');
+    } else {
+      navigate('/payment-sim');
     }
   };
 
-  const handlePlanSave = async () => {
-    if (!user) return;
+  const handleAddUser = async () => {
+    setUserManagementError("");
+    if (companyUsers.filter(u => u.role === "normal").length >= 5) {
+      setUserManagementError("You can only add up to 5 normal users.");
+      return;
+    }
 
     try {
-      const userRef = doc(db, 'users', user.uid);
-      const subscriptionEndDate = new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString();
-      
-      await updateDoc(userRef, {
-        subscriptionType: selectedPlan,
-        subscriptionDate: new Date().toISOString(),
-        subscriptionEndDate
+      const inviteRef = doc(collection(db, "invitations"));
+      await setDoc(inviteRef, {
+        email: newUserEmail.toLowerCase(),
+        companyId: user?.uid,
+        createdAt: new Date(),
       });
-
-      setUserData((prev: UserData | null) => prev ? { 
-        ...prev, 
-        subscriptionType: selectedPlan, 
-        subscriptionDate: new Date().toISOString(),
-        subscriptionEndDate
-      } : null);
-
-      setShowPlanModal(false);
-      setSuccessMessage(`Successfully updated to ${selectedPlan.toUpperCase()} plan!`);
-    } catch (err) {
-      setError('Failed to update subscription plan.');
+      setShowAddUserModal(false);
+      setNewUserEmail("");
+      setSuccessMessage(`Invitation sent to ${newUserEmail}. They need to sign up with this email.`);
+    } catch (error) {
+      setUserManagementError("Failed to send invitation.");
     }
   };
+
+  const handleRemoveUser = async (userIdToRemove: string) => {
+    try {
+      await deleteDoc(doc(db, "users", userIdToRemove));
+      if (user) {
+        await fetchCompanyUsers(user.uid);
+      }
+    } catch (error) {
+      setUserManagementError("Failed to remove user.");
+    }
+  };
+
+  const normalUsersCount = companyUsers.filter(u => u.role === 'normal').length;
 
   if (!user) {
     return <Container className="py-5"><Alert variant="danger">You must be logged in to view the dashboard.</Alert></Container>;
@@ -193,10 +209,24 @@ const EmployerDashboard: React.FC = () => {
       <div className="mb-4 align-items-center">
         <h2>Employer Dashboard</h2>
         <div className="text-end">
-          <Button variant="secondary" className="me-2" onClick={() => navigate('/job-form')}>Post a New Job</Button>
+          <Button 
+            variant="secondary" 
+            className="me-2" 
+            onClick={() => setShowPlanModal(true)}
+            disabled={!!userData && (userData as any).isActive === false}
+          >
+            Post a New Job
+          </Button>
           <Button variant="danger" onClick={handleLogout}>Logout</Button>
         </div>
       </div>
+      
+      {/* Inactive account message */}
+      {userData && (userData as any).isActive === false && (
+        <Alert variant="warning" className="mb-4">
+          Account is inactive. Waiting for admin to activate. This may take up to 24 hours.
+        </Alert>
+      )}
       
       {successMessage && (
         <Alert variant="success" onClose={() => setSuccessMessage(null)} dismissible>
@@ -241,42 +271,23 @@ const EmployerDashboard: React.FC = () => {
                       <strong>Website:</strong> <a href={companyData.website} target="_blank" rel="noopener noreferrer">{companyData.website}</a>
                     </p>
                   )}
+                  {companyData?.phoneNumber && (
+                    <p className="mb-2">
+                      <strong>Phone:</strong> {companyData.phoneNumber}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm" 
-                    className="me-2"
-                    onClick={handleCompanyEdit}
-                  >
-                    Edit Company
-                  </Button>
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm"
-                    onClick={handlePlanEdit}
-                  >
-                    Change Plan
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-3">
-                <Badge 
-                  bg={
-                    userData?.subscriptionType === 'premium' ? 'warning' :
-                    userData?.subscriptionType === 'standard' ? 'success' : 'secondary'
-                  }
-                  className="p-2"
-                  style={{
-                    backgroundColor: userData?.subscriptionType === 'standard' ? 'forestgreen' : undefined
-                  }}
-                >
-                  {userData?.subscriptionType?.toUpperCase() || 'FREE'} PLAN
-                </Badge>
-                {userData?.subscriptionDate && (
-                  <span className="ms-2 text-muted">
-                    (Subscribed until: {new Date(userData.subscriptionEndDate || userData.subscriptionDate).toLocaleDateString()})
-                  </span>
+                {isSuperUser && (
+                  <div>
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm" 
+                      className="me-2"
+                      onClick={handleCompanyEdit}
+                    >
+                      Edit Company
+                    </Button>
+                  </div>
                 )}
               </div>
             </Col>
@@ -331,60 +342,50 @@ const EmployerDashboard: React.FC = () => {
                 onChange={(e) => setEditingCompany(prev => prev ? { ...prev, logoUrl: e.target.value } : null)}
               />
             </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Phone Number</Form.Label>
+              <Form.Control
+                type="tel"
+                placeholder="+254 XXX XXX XXX"
+                value={editingCompany?.phoneNumber || ''}
+                onChange={(e) => setEditingCompany(prev => prev ? { ...prev, phoneNumber: e.target.value } : null)}
+              />
+            </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowCompanyModal(false)}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleCompanySave}>
+          <Button variant="primary" onClick={() => {/* Implement company save logic */}}>
             Save Changes
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* Plan Change Modal */}
+      {/* Plan Selection Modal */}
       <Modal show={showPlanModal} onHide={() => setShowPlanModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Change Subscription Plan</Modal.Title>
+          <Modal.Title>Select a Plan</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
-            <Form.Group>
-              <Form.Label>Select Monthly Plan</Form.Label>
-              <div className="d-flex flex-column gap-2">
-                <Form.Check
-                  type="radio"
-                  id="free"
-                  label="Free Plan - Limited to 1 job posting per month"
-                  checked={selectedPlan === 'free'}
-                  onChange={() => setSelectedPlan('free')}
-                />
-                <Form.Check
-                  type="radio"
-                  id="standard"
-                  label="Standard Plan - KES 500/month (Up to 5 job postings)"
-                  checked={selectedPlan === 'standard'}
-                  onChange={() => setSelectedPlan('standard')}
-                />
-                <Form.Check
-                  type="radio"
-                  id="premium"
-                  label="Premium Plan - KES 999/month (Unlimited job postings)"
-                  checked={selectedPlan === 'premium'}
-                  onChange={() => setSelectedPlan('premium')}
-                />
-              </div>
+            <Form.Group controlId="planSelect">
+              <Form.Label>Choose a job posting plan:</Form.Label>
+              <Form.Select
+                value={selectedPlan}
+                onChange={e => setSelectedPlan(e.target.value as 'free' | 'standard' | 'premium')}
+              >
+                <option value="free">Free - Basic listing, 15 days</option>
+                <option value="standard">Standard - $75, Enhanced visibility, 30 days</option>
+                <option value="premium">Premium - $120, Featured, Top of search, 30 days</option>
+              </Form.Select>
             </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowPlanModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handlePlanSave}>
-            Update Plan
-          </Button>
+          <Button variant="secondary" onClick={() => setShowPlanModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handlePlanConfirm}>Continue</Button>
         </Modal.Footer>
       </Modal>
 
@@ -407,7 +408,6 @@ const EmployerDashboard: React.FC = () => {
                 <div style={{ flex: 1 }}>
                   <h5 className="mb-1">
                     {job.title}
-                    {isFeatured && <span className="badge bg-warning ms-2">Featured</span>}
                   </h5>
                   <div className="text-muted mb-1">
                     <strong>Type:</strong> {job.jobType} &nbsp;|&nbsp;
@@ -422,16 +422,6 @@ const EmployerDashboard: React.FC = () => {
                   )}
                 </div>
                 <div className="d-flex gap-2">
-                  {canSendNotifications && (
-                    <Button
-                      variant="success"
-                      size="sm"
-                      style={{ backgroundColor: 'forestgreen', borderColor: 'forestgreen' }}
-                      onClick={() => {/* Implement notification sending logic */}}
-                    >
-                      Notify Subscribers
-                    </Button>
-                  )}
                   <Button
                     variant="outline-primary"
                     size="sm"
@@ -443,7 +433,7 @@ const EmployerDashboard: React.FC = () => {
                     variant="danger"
                     size="sm"
                     onClick={() => handleDelete(job.id)}
-                    disabled={deleting === job.id}
+                    disabled={deleting === job.id || (!isSuperUser && job.postedBy !== user?.uid)}
                   >
                     {deleting === job.id ? 'Deleting...' : 'Delete'}
                   </Button>
@@ -461,6 +451,79 @@ const EmployerDashboard: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* User Management Section */}
+      {isSuperUser && (
+        <Card className="mb-4">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">User Management</h5>
+              <Button
+                variant="primary"
+                onClick={() => setShowAddUserModal(true)}
+                disabled={normalUsersCount >= 5}
+              >
+                Add User
+              </Button>
+            </div>
+            <hr />
+            {normalUsersCount >= 5 && <Alert variant="warning">You have reached the maximum of 5 normal users.</Alert>}
+            <Table striped bordered hover size="sm" className="mt-3">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companyUsers.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.email}</td>
+                    <td>
+                      <Badge bg={u.role === 'super' ? 'success' : 'secondary'}>
+                        {u.role}
+                      </Badge>
+                    </td>
+                    <td>
+                      {u.role === 'normal' && (
+                        <Button
+                          variant="outline-danger"
+                          size="sm"
+                          onClick={() => handleRemoveUser(u.id)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Add User Modal */}
+      <Modal show={showAddUserModal} onHide={() => setShowAddUserModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add a New User</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>An invitation will be sent. The user must sign up with this exact email to join your company.</p>
+          <Form.Control
+            type="email"
+            placeholder="Enter user's email"
+            value={newUserEmail}
+            onChange={(e) => setNewUserEmail(e.target.value)}
+          />
+          {userManagementError && <Alert variant="danger" className="mt-3">{userManagementError}</Alert>}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowAddUserModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handleAddUser}>Send Invitation</Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

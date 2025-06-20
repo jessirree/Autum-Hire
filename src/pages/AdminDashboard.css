@@ -1,0 +1,88 @@
+.search-input {
+  max-width: 500px;
+  margin: 0 auto;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  padding: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  border-color: var(--pumpkin-orange);
+  box-shadow: 0 0 0 0.2rem rgba(247, 108, 94, 0.25);
+}
+
+.table {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table th {
+  background-color: var(--forest-green);
+  color: white;
+  font-weight: 500;
+  border: none;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.badge {
+  padding: 0.5em 0.75em;
+  font-weight: 500;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.75rem;
+  font-weight: 500;
+}
+
+.modal-content {
+  border-radius: 12px;
+  border: none;
+}
+
+.modal-header {
+  background-color: var(--forest-green);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-footer {
+  border-top: 1px solid #eee;
+}
+
+@media (max-width: 768px) {
+  .table-responsive {
+    margin: 0 -1rem;
+  }
+  
+  .table th, .table td {
+    white-space: nowrap;
+  }
+}
+
+.wide-btn {
+  min-width: 220px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 1rem;
+  padding: 0.75rem 2.5rem;
+  border-radius: 8px;
+  transition: box-shadow 0.2s, background 0.2s, color 0.2s;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+}
+
+.active-glow {
+  background: #8A9A5B !important;
+  color: #fff !important;
+  box-shadow: 0 0 16px 4px #8A9A5B, 0 2px 8px rgba(25, 118, 210, 0.18);
+  border: 2px solid #8A9A5B !important;
+  z-index: 2;
+}
+
+.admin-tab-buttons {
+  gap: 2rem;
+} 

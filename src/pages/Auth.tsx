@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Form, Button, Card, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Form, Button, Card, Alert, Modal } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { signIn, signUp, db } from '../firebase';
-import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import {
+  setDoc,
+  doc,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+} from 'firebase/firestore';
 import './Auth.css';
+import TermsandConditions from './TermsandConditions';
 
 const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
 
@@ -12,6 +22,21 @@ const isValidImageUrl = (url: string) => {
   const lower = url.toLowerCase();
   return imageExtensions.some(ext => lower.endsWith(ext));
 };
+
+// List of common free email providers
+const freeEmailProviders = [
+  'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'aol.com', 'icloud.com',
+  'protonmail.com', 'zoho.com', 'yandex.com', 'mail.com', 'gmx.com', 'ymail.com',
+  'msn.com', 'live.com', 'me.com', 'inbox.com', 'fastmail.com', 'hushmail.com',
+  'rocketmail.com', 'rediffmail.com', 'tutanota.com', 'mail.ru', 'qq.com', 'naver.com',
+  '163.com', '126.com', 'sina.com', 'yeah.net', 'googlemail.com', 'aim.com', 'lycos.com',
+  'seznam.cz', 'zoznam.sk', 'mailinator.com', 'dispostable.com', 'trashmail.com', 'tempmail.com'
+];
+
+function isFreeEmail(email: string) {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return freeEmailProviders.includes(domain);
+}
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
@@ -25,9 +50,12 @@ const Auth: React.FC = () => {
   const [website, setWebsite] = useState('');
   const [industry, setIndustry] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [logoUrlError, setLogoUrlError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   // Check for intended plan on component mount
   useEffect(() => {
@@ -53,45 +81,98 @@ const Auth: React.FC = () => {
     setLoading(true);
 
     try {
+      // Block free email providers for both login and signup
+      if (isFreeEmail(email)) {
+        throw new Error('Please use your organization email address. Free email providers are not allowed.');
+      }
       if (!isLogin && password !== confirmPassword) {
         throw new Error('Passwords do not match');
       }
       if (!isLogin && logoUrl && !isValidImageUrl(logoUrl)) {
         throw new Error('Logo URL must end with a valid image extension.');
       }
+      if (!isLogin && !acceptedTerms) {
+        throw new Error('You must accept the terms and conditions to sign up.');
+      }
 
       if (isLogin) {
+        // LOGIN LOGIC (without email verification check)
         await signIn(email, password);
-        // Check for intended plan after successful login
-        const intendedPlan = sessionStorage.getItem('intendedPlan');
-        if (intendedPlan) {
-          sessionStorage.removeItem('intendedPlan'); // Clear the stored plan
-          navigate('/post-job'); // Redirect back to pricing page
+        const userDoc = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+        const userData = userDoc.docs[0]?.data();
+        if (userData?.role === 'admin') {
+          navigate('/admin');
         } else {
-          navigate('/employer-dashboard');
+          const intendedPlan = sessionStorage.getItem('intendedPlan');
+          if (intendedPlan) {
+            sessionStorage.removeItem('intendedPlan');
+            navigate('/post-job');
+          } else {
+            navigate('/employer-dashboard');
+          }
         }
       } else {
-        // Sign up user
+        // Check for duplicate email
+        const emailQuery = query(collection(db, 'users'), where('email', '==', email));
+        const emailSnapshot = await getDocs(emailQuery);
+        if (!emailSnapshot.empty) {
+          throw new Error('Email already exists');
+        }
+        // Check for duplicate company name
+        const companyNameQuery = query(collection(db, 'companies'), where('name', '==', companyName));
+        const companyNameSnapshot = await getDocs(companyNameQuery);
+        if (!companyNameSnapshot.empty) {
+          throw new Error('Company already exists');
+        }
+        // Check for duplicate phone number (if provided)
+        if (phoneNumber) {
+          const phoneQuery = query(collection(db, 'companies'), where('phoneNumber', '==', phoneNumber));
+          const phoneSnapshot = await getDocs(phoneQuery);
+          if (!phoneSnapshot.empty) {
+            throw new Error('Phone number already exists');
+          }
+        }
+
+        // SIGNUP LOGIC (without email verification)
         const userCredential = await signUp(email, password);
         const user = userCredential.user;
-        // Create company doc (companyId = user.uid)
-        await setDoc(doc(db, 'companies', user.uid), {
-          name: companyName,
-          location,
-          website,
-          industry,
-          logoUrl,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-        });
-        // Create user doc
-        await setDoc(doc(db, 'users', user.uid), {
-          email: user.email,
-          companyId: user.uid,
-          createdAt: serverTimestamp(),
-          subscriptionType: 'free',
-          subscriptionDate: new Date().toISOString(),
-        });
+
+        const invitesRef = collection(db, "invitations");
+        const q = query(invitesRef, where("email", "==", user.email!.toLowerCase()));
+        const inviteSnapshot = await getDocs(q);
+
+        if (!inviteSnapshot.empty) {
+          const invite = inviteSnapshot.docs[0];
+          const companyId = invite.data().companyId;
+          await setDoc(doc(db, "users", user.uid), {
+            email: user.email,
+            companyId: companyId,
+            role: "normal",
+            isActive: false,
+            createdAt: serverTimestamp(),
+          });
+          await deleteDoc(invite.ref);
+        } else {
+          await setDoc(doc(db, "companies", user.uid), {
+            name: companyName,
+            location,
+            website,
+            industry,
+            logoUrl,
+            phoneNumber,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+          });
+          await setDoc(doc(db, "users", user.uid), {
+            email: user.email,
+            companyId: user.uid,
+            role: "super",
+            isActive: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+        
+        // Navigate directly to the dashboard
         navigate('/employer-dashboard');
       }
     } catch (err: any) {
@@ -142,8 +223,8 @@ const Auth: React.FC = () => {
                       </Col>
                       <Col md={6}>
                         <Form.Group className="mb-3">
-                          <Form.Label>Website</Form.Label>
-                          <Form.Control type="text" placeholder="Website" value={website} onChange={e => setWebsite(e.target.value)} />
+                          <Form.Label>Phone Number</Form.Label>
+                          <Form.Control type="tel" placeholder="+254 XXX XXX XXX" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
                         </Form.Group>
                       </Col>
                     </Row>
@@ -165,6 +246,15 @@ const Auth: React.FC = () => {
                         </div>
                       )}
                     </Form.Group>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Website</Form.Label>
+                      <Form.Control
+                        type="text"
+                        placeholder="Website"
+                        value={website}
+                        onChange={e => setWebsite(e.target.value)}
+                      />
+                    </Form.Group>
                   </>
                 )}
                 <Form.Group className="mb-3">
@@ -181,7 +271,38 @@ const Auth: React.FC = () => {
                     <Form.Control type="password" placeholder="Confirm your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
                   </Form.Group>
                 )}
-                <Button type="submit" className="w-100 mb-3 auth-button" disabled={loading || !!logoUrlError}>
+                {!isLogin && (
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="checkbox"
+                      id="terms-checkbox"
+                      label={
+                        <span>
+                          I agree to the{' '}
+                          <span
+                            className="auth-link"
+                            style={{ color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}
+                            onClick={e => { e.preventDefault(); setShowTermsModal(true); }}
+                          >
+                            terms and conditions
+                          </span>
+                        </span>
+                      }
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      required
+                      isInvalid={!isLogin && !acceptedTerms}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      You must accept the terms and conditions to sign up
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                )}
+                <Button 
+                  type="submit" 
+                  className="w-100 mb-3 auth-button" 
+                  disabled={loading || !!logoUrlError || (!isLogin && !acceptedTerms)}
+                >
                   {loading ? 'Processing...' : isLogin ? 'Login' : 'Sign Up'}
                 </Button>
                 <div className="text-center">
@@ -197,6 +318,15 @@ const Auth: React.FC = () => {
           </Card>
         </Col>
       </Row>
+      {/* Terms and Conditions Modal */}
+      <Modal show={showTermsModal} onHide={() => setShowTermsModal(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Terms and Conditions</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          <TermsandConditions />
+        </Modal.Body>
+      </Modal>
     </Container>
   );
 };
