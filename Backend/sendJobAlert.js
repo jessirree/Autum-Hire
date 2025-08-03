@@ -28,7 +28,7 @@ app.use(express.json());
 app.use(cors()); // Allow requests from your frontend
 
 // Nodemailer transporter for job alerts
-const jobAlertsTransporter = nodemailer.createTransporter({
+const jobAlertsTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.autumhire.com',
   port: parseInt(process.env.SMTP_PORT) || 465,
   secure: true,
@@ -39,7 +39,7 @@ const jobAlertsTransporter = nodemailer.createTransporter({
 });
 
 // Nodemailer transporter for contact form (info@autumhire.com)
-const infoTransporter = nodemailer.createTransporter({
+const infoTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.autumhire.com',
   port: parseInt(process.env.SMTP_PORT) || 465,
   secure: true,
