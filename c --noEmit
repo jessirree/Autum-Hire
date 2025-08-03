@@ -1,0 +1,21 @@
+[33me77d905[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m SECURITY FIX
+[33m7ca1b39[m Fix security vulnerabilities: update dependencies and remove vulnerable form-data package
+[33m6910def[m Remove sensitive Firebase credentials and use environment variables
+[33me700c4a[m Initial commit with frontend and backend for Railway deployment
+[33mb4f44e4[m updated dependancies
+[33m7d4f0bf[m More updates
+[33ma6a32cd[m Changed pricing
+[33m2398252[m Modified home page
+[33m8f41317[m Updated employer dashboard
+[33m815662b[m Improved site responsiveness
+[33mb41b86d[m change background image layout
+[33m9db8649[m slight layout change
+[33me1157bf[m Fixed errors
+[33mfbb2768[m Updates
+[33m8d24030[m Update build config for Vercel deployment
+[33m3c62476[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m Updated overall style
+[33m9e8107c[m Fix routing and base URL configuration
+[33mf700bcd[m Switch to docs folder for GitHub Pages
+[33m5d11bf5[m Deploy to main branch
+[33ma25b0d0[m Initial commit
+[33m4aec98e[m First commit
