@@ -1,4 +1,4 @@
-import{r as s,R as W,a as ce}from"./router-BqiFuhF3.js";import{g as at}from"./vendor-DJG_os-6.js";var Ue={exports:{}},xe={};/**
+import{r as s,R as W,a as ce}from"./router-DQb387e7.js";import{g as at}from"./vendor-gH-7aFTg.js";var Ue={exports:{}},xe={};/**
  * @license React
  * react-jsx-runtime.production.js
  *
