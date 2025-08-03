@@ -11,6 +11,10 @@ node_modules
 *.local
 .env
 
+# Firebase service account key (sensitive)
+Backend/serviceAccountKey.json
+**/serviceAccountKey.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
