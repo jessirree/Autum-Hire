@@ -10,6 +10,10 @@ lerna-debug.log*
 node_modules
 *.local
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Firebase service account key (sensitive)
 Backend/serviceAccountKey.json
