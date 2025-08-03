@@ -56,6 +56,8 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<{ place_id: string; display_name: string }[]>([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
 
   // Check for intended plan on component mount
   useEffect(() => {
@@ -73,6 +75,34 @@ const Auth: React.FC = () => {
     } else {
       setLogoUrlError('');
     }
+  };
+
+  const handleLocationAutocomplete = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocation(value);
+    if (value.length > 2) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(value)}&format=json&limit=5`,
+          { headers: { 'User-Agent': 'autumhire-job-platform/1.0' } }
+        );
+        const data = await res.json();
+        setLocationSuggestions(data);
+        setShowLocationDropdown(true);
+      } catch (err) {
+        setLocationSuggestions([]);
+        setShowLocationDropdown(false);
+      }
+    } else {
+      setLocationSuggestions([]);
+      setShowLocationDropdown(false);
+    }
+  };
+
+  const handleLocationSuggestionClick = (city: { place_id: string; display_name: string }) => {
+    setLocation(city.display_name);
+    setLocationSuggestions([]);
+    setShowLocationDropdown(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,45 +133,59 @@ const Auth: React.FC = () => {
         if (userData?.role === 'admin') {
           navigate('/admin');
         } else {
-          const intendedPlan = sessionStorage.getItem('intendedPlan');
-          if (intendedPlan) {
+        const intendedPlan = sessionStorage.getItem('intendedPlan');
+        if (intendedPlan) {
             sessionStorage.removeItem('intendedPlan');
-            navigate('/post-job');
-          } else {
-            navigate('/employer-dashboard');
+            navigate('/job-form');
+        } else {
+          navigate('/employer-dashboard');
           }
         }
       } else {
+        console.log('Starting signup process...');
+        
         // Check for duplicate email
+        console.log('Checking for duplicate email...');
         const emailQuery = query(collection(db, 'users'), where('email', '==', email));
         const emailSnapshot = await getDocs(emailQuery);
         if (!emailSnapshot.empty) {
           throw new Error('Email already exists');
         }
+        console.log('Email check passed');
+        
         // Check for duplicate company name
+        console.log('Checking for duplicate company name...');
         const companyNameQuery = query(collection(db, 'companies'), where('name', '==', companyName));
         const companyNameSnapshot = await getDocs(companyNameQuery);
         if (!companyNameSnapshot.empty) {
           throw new Error('Company already exists');
         }
+        console.log('Company name check passed');
+        
         // Check for duplicate phone number (if provided)
         if (phoneNumber) {
+          console.log('Checking for duplicate phone number...');
           const phoneQuery = query(collection(db, 'companies'), where('phoneNumber', '==', phoneNumber));
           const phoneSnapshot = await getDocs(phoneQuery);
           if (!phoneSnapshot.empty) {
             throw new Error('Phone number already exists');
           }
+          console.log('Phone number check passed');
         }
 
         // SIGNUP LOGIC (without email verification)
+        console.log('Creating Firebase user account...');
         const userCredential = await signUp(email, password);
         const user = userCredential.user;
+        console.log('Firebase user created:', user.uid);
 
+        console.log('Checking for invitations...');
         const invitesRef = collection(db, "invitations");
         const q = query(invitesRef, where("email", "==", user.email!.toLowerCase()));
         const inviteSnapshot = await getDocs(q);
 
         if (!inviteSnapshot.empty) {
+          console.log('Found invitation, creating normal user...');
           const invite = inviteSnapshot.docs[0];
           const companyId = invite.data().companyId;
           await setDoc(doc(db, "users", user.uid), {
@@ -152,26 +196,35 @@ const Auth: React.FC = () => {
             createdAt: serverTimestamp(),
           });
           await deleteDoc(invite.ref);
+          console.log('Normal user created successfully');
         } else {
+          console.log('No invitation found, creating super user and company...');
+          
+          console.log('Creating company document...');
           await setDoc(doc(db, "companies", user.uid), {
-            name: companyName,
-            location,
-            website,
-            industry,
-            logoUrl,
-            phoneNumber,
-            createdBy: user.uid,
-            createdAt: serverTimestamp(),
-          });
+          name: companyName,
+          location,
+          website,
+          industry,
+          logoUrl,
+          phoneNumber,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+          console.log('Company document created successfully');
+          
+          console.log('Creating user document...');
           await setDoc(doc(db, "users", user.uid), {
-            email: user.email,
-            companyId: user.uid,
+          email: user.email,
+          companyId: user.uid,
             role: "super",
             isActive: false,
-            createdAt: serverTimestamp(),
-          });
+          createdAt: serverTimestamp(),
+        });
+          console.log('User document created successfully');
         }
         
+        console.log('Signup completed successfully');
         // Navigate directly to the dashboard
         navigate('/employer-dashboard');
       }
@@ -218,7 +271,24 @@ const Auth: React.FC = () => {
                       <Col md={6}>
                         <Form.Group className="mb-3">
                           <Form.Label>Location</Form.Label>
-                          <Form.Control type="text" placeholder="city, country" value={location} onChange={e => setLocation(e.target.value)} />
+                          <div style={{ position: 'relative' }}>
+                            <Form.Control
+                              type="text"
+                              placeholder="city, country"
+                              value={location}
+                              onChange={handleLocationAutocomplete}
+                              autoComplete="off"
+                            />
+                            {showLocationDropdown && locationSuggestions.length > 0 && (
+                              <ul style={{ position: 'absolute', zIndex: 10, background: 'white', width: '100%', border: '1px solid #ccc', maxHeight: 180, overflowY: 'auto', margin: 0, padding: 0, listStyle: 'none' }}>
+                                {locationSuggestions.map(city => (
+                                  <li key={city.place_id} onClick={() => handleLocationSuggestionClick(city)} style={{ padding: '8px', cursor: 'pointer' }}>
+                                    {city.display_name}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         </Form.Group>
                       </Col>
                       <Col md={6}>

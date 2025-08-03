@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Form, Button, Card, Alert } from 'react-bootstrap';
 import { FaEnvelope, FaMapMarkerAlt } from 'react-icons/fa';
+import { API_ENDPOINTS } from '../config/api';
 import './ContactUs.css';
+import { Helmet } from 'react-helmet-async';
 
 const ContactUs: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -29,9 +31,18 @@ const ContactUs: React.FC = () => {
     setSuccess(false);
 
     try {
-      // Here you would typically send the form data to your backend
-      // For now, we'll just simulate a successful submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Send the form data to the backend endpoint
+      const response = await fetch(API_ENDPOINTS.SEND_CONTACT_MESSAGE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
       setSuccess(true);
       setFormData({
         name: '',
@@ -39,8 +50,12 @@ const ContactUs: React.FC = () => {
         subject: '',
         message: ''
       });
-    } catch (err) {
-      setError('Failed to send message. Please try again later.');
+      } else {
+        throw new Error(data.error || 'Failed to send message');
+      }
+    } catch (err: any) {
+      console.error('Error sending contact message:', err);
+      setError(err.message || 'Failed to send message. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -48,6 +63,13 @@ const ContactUs: React.FC = () => {
 
   return (
     <Container className="py-5">
+      <Helmet>
+        <title>Contact Us | Autumhire</title>
+        <meta name="description" content="Contact Autumhire for support, questions, or feedback. We're here to help you find or post jobs." />
+        <meta property="og:title" content="Contact Us | Autumhire" />
+        <meta property="og:description" content="Contact Autumhire for support, questions, or feedback. We're here to help you find or post jobs." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <h1 className="text-center mb-5">Contact Us</h1>
       
       <Row className="justify-content-center">
@@ -60,7 +82,7 @@ const ContactUs: React.FC = () => {
                 <FaEnvelope className="contact-icon" />
                 <div>
                   <h5>Email</h5>
-                  <p>admin@autumhire.com</p>
+                  <p>info@autumhire.com</p>
                 </div>
               </div>
 
@@ -82,7 +104,7 @@ const ContactUs: React.FC = () => {
               
               {success && (
                 <Alert variant="success" onClose={() => setSuccess(false)} dismissible>
-                  Your message has been sent successfully. We'll get back to you soon!
+                  Your message has been sent successfully! We've sent you a confirmation email and will get back to you soon.
                 </Alert>
               )}
               

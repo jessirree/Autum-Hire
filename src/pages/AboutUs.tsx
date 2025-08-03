@@ -1,9 +1,17 @@
 import React from 'react';
 import './AboutUs.css';
+import { Helmet } from 'react-helmet-async';
 
 const AboutUs: React.FC = () => {
   return (
     <div style={{ width: '100vw', overflowX: 'hidden' }}>
+      <Helmet>
+        <title>About Us | Autumhire</title>
+        <meta name="description" content="Learn about Autumhire, our mission, vision, and values in talent acquisition and HR innovation." />
+        <meta property="og:title" content="About Us | Autumhire" />
+        <meta property="og:description" content="Learn about Autumhire, our mission, vision, and values in talent acquisition and HR innovation." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <div className="about-us-container">
         <div className="container py-5">
           <h1 className="text-center mb-5">About Us</h1>
@@ -12,10 +20,10 @@ const AboutUs: React.FC = () => {
           <section className="mb-5">
             <h2 className="section-title">Who We Are</h2>
             <p className="section-content">
-            Autum hire is a proactive Human Resource Management consultancy firm specializing in Strategic Recruitment, learning and development systems and Team building. 
+            Autumhire solutions is a proactive Human resource firm specializing in Strategic resourcing systems, learning and development systems, compensation and benefits and Team building.
             </p>
             <p className="section-content">
-            We champion the best Human Resource practice and integrate it with innovation and modern technology for the benefit of our clients. With Autum hire you can seamlessly source the best talent in the market, identifying future business needs and building a candidate talent pool for the future. 
+            We champion the best Human Resource practice and integrate it with innovation and modern technology for the benefit of our clients.
             </p>
           </section>
 

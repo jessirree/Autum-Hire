@@ -1,0 +1,14 @@
+{
+    "name": "autumhire/backend",
+    "description": "Autumhire Backend API",
+    "type": "project",
+    "require": {
+        "phpmailer/phpmailer": "^6.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Autumhire\\": "src/"
+        }
+    },
+    "minimum-stability": "stable"
+} 

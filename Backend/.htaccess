@@ -1,0 +1,13 @@
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ sendJobAlert.js [L]
+
+# Enable CORS for all origins
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+
+# Handle preflight requests
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ - [R=200,L] 

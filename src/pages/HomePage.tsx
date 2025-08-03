@@ -1,5 +1,7 @@
 // src/pages/HomePage.tsx
 import { FaSearch, FaChevronLeft, FaChevronRight, FaBell } from "react-icons/fa";
+import { Modal, Button } from 'react-bootstrap';
+import { Helmet } from 'react-helmet-async';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './HomePage.css';
@@ -7,14 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
-import Collapse from 'react-bootstrap/Collapse';
 
-export default function HomePage() {
+const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [keywords, setKeywords] = useState('');
   const [featuredJobs, setFeaturedJobs] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchFeaturedJobs = async () => {
@@ -48,6 +49,10 @@ export default function HomePage() {
 
   return (
     <div style={{ width: '100vw', overflowX: 'hidden' }}>
+      <Helmet>
+        <title>Autumhire - Find Your Next Job</title>
+        <meta name="description" content="Browse the latest job listings on Autumhire and find your next opportunity." />
+      </Helmet>
       {/* Hero Section */}
       <div
         className="hero-section d-flex flex-column justify-content-center align-items-center position-relative"
@@ -56,7 +61,7 @@ export default function HomePage() {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          minHeight: '60vh',
+          minHeight: '75vh',
           width: '100%',
           padding: 0,
           margin: 0,
@@ -144,12 +149,12 @@ export default function HomePage() {
             }}
             className="hide-scrollbar"
           >
-            {featuredJobs.length === 0 ? (
+            {featuredJobs.filter(job => job.status === 'active').length === 0 ? (
               <div className="text-muted">No featured jobs available.</div>
             ) : (
-              featuredJobs.map((job, index) => (
+              featuredJobs.filter(job => job.status === 'active').map((job, index) => (
                 <div key={job.id || index} style={{ minWidth: 300, maxWidth: 340 }} className="position-relative">
-                  <div className="text-center p-4 shadow-sm rounded h-100" style={{ background: '#eae3d2' }}>
+                  <div className="text-center p-4 shadow-sm rounded h-100" style={{ background: 'white' }}>
                     <img
                       src={job.companyLogo || '/default_logo.png'}
                       alt="Company Logo"
@@ -163,29 +168,11 @@ export default function HomePage() {
                       <p className="mb-0"><i className="fas fa-briefcase me-2"></i>{job.jobType}</p>
                     </div>
                     <button
-                      className="btn login-btn w-100 mt-3"
-                      onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
+                      className="btn featured-job-view-details-btn w-100 mt-3"
+                      onClick={() => setSelectedJob(job)}
                     >
-                      {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
+                      View Details
                     </button>
-                    <Collapse in={expandedJobId === job.id}>
-                      <div>
-                        <div className="mt-3 text-start">
-                          <strong>Description:</strong>
-                          <div style={{ whiteSpace: 'pre-line' }}>{job.description}</div>
-                          {job.website && (
-                            <div className="mt-2">
-                              <strong>Company Website:</strong> <a href={job.website} target="_blank" rel="noopener noreferrer">{job.website}</a>
-                            </div>
-                          )}
-                          {job.location && (
-                            <div className="mt-2">
-                              <strong>Location:</strong> {job.location}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Collapse>
                   </div>
                 </div>
               ))
@@ -202,6 +189,85 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Job Details Modal */}
+      <Modal show={!!selectedJob} onHide={() => setSelectedJob(null)} centered size="xl" className="wide-modal">
+        <Modal.Header>
+          <Modal.Title>Job Details</Modal.Title>
+          <Button variant="close" aria-label="Close" onClick={() => setSelectedJob(null)} style={{ position: 'absolute', right: 16, top: 16, fontSize: 24, background: 'none', border: 'none' }}>
+            &times;
+          </Button>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {selectedJob && (
+            <div className="row">
+              <div className="col-md-8">
+                <h5 className="mb-3">{selectedJob.title}</h5>
+                <div className="mb-4">
+                  <h6>Job Description</h6>
+                  <div 
+                    style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}
+                    dangerouslySetInnerHTML={{ __html: selectedJob.description }}
+                  />
+                </div>
+                {selectedJob.applicationLink && (
+                  <div className="mb-4">
+                    <a 
+                      href={selectedJob.applicationLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="btn btn-primary btn-lg"
+                      style={{ 
+                        backgroundColor: 'var(--pumpkin-orange)',
+                        borderColor: 'var(--pumpkin-orange)'
+                      }}
+                    >
+                      Apply Now
+                    </a>
+                  </div>
+                )}
+              </div>
+              <div className="col-md-4">
+                <div className="card h-100" style={{ backgroundColor: 'var(--background-alt)', border: 'none' }}>
+                  <div className="card-body">
+                    <h6 className="card-title mb-3">Job Details</h6>
+                    <div className="mb-3">
+                      <small className="text-muted">Company</small>
+                      <p className="mb-0 fw-bold">{selectedJob.companyName}</p>
+                    </div>
+                    <div className="mb-3">
+                      <small className="text-muted">Salary</small>
+                      <p className="mb-0 fw-bold">{selectedJob.salary}</p>
+                    </div>
+                    <div className="mb-3">
+                      <small className="text-muted">Job Type</small>
+                      <p className="mb-0">{selectedJob.jobType}</p>
+                    </div>
+                    <div className="mb-3">
+                      <small className="text-muted">Experience Level</small>
+                      <p className="mb-0">{selectedJob.experienceLevel}</p>
+                    </div>
+                    <div className="mb-3">
+                      <small className="text-muted">Location</small>
+                      <p className="mb-0">{selectedJob.location}</p>
+                    </div>
+              {selectedJob.website && (
+                      <div className="mb-3">
+                        <small className="text-muted">Company Website</small>
+                        <p className="mb-0">
+                          <a href={selectedJob.website} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                            Visit Website
+                          </a>
+                        </p>
+                      </div>
+              )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+      </Modal>
+
       {/* Footer */}
       <footer className="bg-dark text-white text-center p-4" style={{ width: '100vw' }}>
         <div className="container">
@@ -211,11 +277,13 @@ export default function HomePage() {
             <a href="#" className="text-white"><i className="fab fa-linkedin-in"></i></a>
           </div>
           <div className="small">
-            <a href="#" className="text-white me-2">Terms and Conditions</a> |
-            <a href="#" className="text-white ms-2">Privacy Policy</a>
+            <a href="/terms" className="text-white me-2">Terms and Conditions</a> |
+            <a href="/contact" className="text-white ms-2">Contact Us</a>
           </div>
         </div>
       </footer>
     </div>
   );
-}
+};
+
+export default HomePage;

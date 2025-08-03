@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
+import React, { useState, useRef, useEffect } from 'react';
+import { Container, Form, Button, Alert, Row, Col, Modal, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebase';
-import { collection, addDoc, setDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, serverTimestamp, getDoc, query, where, getDocs } from 'firebase/firestore';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import dayjs from 'dayjs';
+import RichTextEditor from '../components/RichTextEditor';
+import { API_ENDPOINTS } from '../config/api';
 
-const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary'];
+const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary', 'Hybrid', 'Graduate Trainee'];
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'INR', 'CAD', 'AUD', 'JPY', 'CNY'];
-const experienceLevels = ['Entry Level', 'Mid Level', 'Senior Level'];
+const experienceLevels = ['Entry Level', 'Mid Level', 'Senior Level', 'Executive'];
 
 const JobForm: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +29,7 @@ const JobForm: React.FC = () => {
   // Job fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [applicationLink, setApplicationLink] = useState('');
   const [salary, setSalary] = useState('');
   const [salaryCurrency, setSalaryCurrency] = useState(currencies[0]);
   const [jobType, setJobType] = useState(jobTypes[0]);
@@ -36,53 +39,104 @@ const JobForm: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'premium' | null>(null);
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'premium'>('free');
+  const [locationSuggestions, setLocationSuggestions] = useState<{ place_id: string; display_name: string }[]>([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
-    // Auto-fill company details from Firestore
-    const fetchCompany = async () => {
-      if (!user) return;
-      const companyDoc = await getDoc(doc(db, 'companies', user.uid));
-      if (companyDoc.exists()) {
-        const data = companyDoc.data();
-        setCompanyName(data.name || '');
-        setLocation(data.location || '');
-        setWebsite(data.website || '');
-        setIndustry(data.industry || '');
-        setLogoUrl(data.logoUrl || '');
+    if (!user) return;
+    const fetchUserData = async () => {
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        setUserData(userDoc.data());
       }
     };
-    fetchCompany();
-
-    const plan = sessionStorage.getItem('selectedPlan') as 'free' | 'standard' | 'premium' | null;
-    if (!plan) {
-      navigate('/post-job');
-    } else {
-      setSelectedPlan(plan);
-    }
-  }, [user, navigate]);
+    fetchUserData();
+  }, [user]);
 
   if (!user) {
     return <Container className="py-5"><Alert variant="danger">You must be logged in to post a job.</Alert></Container>;
   }
 
-  if (!selectedPlan) {
-    return null; // Or a loading spinner
+  // Prevent job posting if account is deactivated by admin
+  if (userData && userData.isActive === false) {
+    const createdAt = userData.createdAt;
+    if (createdAt) {
+      const createdDate = new Date(createdAt.seconds * 1000);
+      const today = new Date();
+      const isToday =
+        createdDate.getFullYear() === today.getFullYear() &&
+        createdDate.getMonth() === today.getMonth() &&
+        createdDate.getDate() === today.getDate();
+      if (!isToday) {
+        return (
+          <Container className="py-5">
+            <Alert variant="danger">
+              Your account has been deactivated by an admin. You cannot post new jobs. Please contact support for more information.
+            </Alert>
+          </Container>
+        );
+      }
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
-    setLoading(true);
-
-    if (!user) {
-      setError('You must be logged in to post a job');
-      setLoading(false);
+    
+    // Validate form fields
+    if (!title.trim() || !description.trim() || !location.trim()) {
+      setError('Please fill in all required fields');
       return;
     }
 
+    // Show plan selection modal
+    setShowPlanModal(true);
+  };
+
+  const handlePlanSelection = async () => {
+    setShowPlanModal(false);
+    setLoading(true);
+
     try {
+      // Handle payment flow first if not free
+      if (selectedPlan !== 'free') {
+        // Store form data temporarily
+        sessionStorage.setItem('tempJobData', JSON.stringify({
+          title,
+          description,
+          applicationLink,
+          location,
+          salary,
+          salaryCurrency,
+          jobType,
+          experienceLevel,
+          deadline: deadline?.toISOString(),
+          plan: selectedPlan,
+          industry
+        }));
+        
+        // Navigate to payment simulation
+        navigate('/payment-sim');
+        return;
+      }
+
+      // For free plan, submit directly
+      await submitJob();
+    } catch (err: any) {
+      setError(err.message || 'Failed to process job posting');
+      setLoading(false);
+    }
+  };
+
+  const submitJob = async () => {
+    if (!user) {
+      throw new Error('You must be logged in to post a job');
+    }
+
       // Get company data
       const companyRef = doc(db, 'companies', user.uid);
       const companyDoc = await getDoc(companyRef);
@@ -103,6 +157,7 @@ const JobForm: React.FC = () => {
       const jobRef = await addDoc(collection(db, 'jobs'), {
         title,
         description,
+        applicationLink,
         location,
         salary: `${salaryCurrency} ${salary}`,
         jobType,
@@ -115,10 +170,44 @@ const JobForm: React.FC = () => {
         status: 'active',
         plan: selectedPlan,
         paymentStatus: selectedPlan === 'free' ? 'not_required' : 'simulated_paid',
+        industry,
       });
 
+      const jobId = jobRef.id;
+
+      // Ensure industry exists in industries collection
+      if (industry && industry.trim()) {
+        const industriesRef = collection(db, 'industries');
+        const q = query(industriesRef, where('name', '==', industry.trim()));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+          await addDoc(industriesRef, { name: industry.trim(), createdAt: new Date() });
+        }
+      }
+
+      // Notify subscribers if plan is standard or premium
+      if (selectedPlan === 'standard' || selectedPlan === 'premium') {
+      try {
+        const notifyUrl = `${window.location.origin}`;
+        await fetch(API_ENDPOINTS.NOTIFY_JOB_POSTED, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            industry,
+            url: notifyUrl,
+            plan: selectedPlan,
+            jobId
+          })
+        });
+        console.log('Job notification sent successfully');
+      } catch (notifyError) {
+        console.warn('Failed to send job notifications (backend not available):', notifyError);
+        // Don't throw the error - job posting should still succeed
+      }
+      }
+
       setSuccess('Job posted successfully!');
-      sessionStorage.removeItem('selectedPlan');
       
       // Redirect to dashboard after a short delay
       setTimeout(() => {
@@ -129,11 +218,35 @@ const JobForm: React.FC = () => {
         });
       }, 1500);
 
-    } catch (err: any) {
-      setError(err.message || 'Failed to post job');
-    } finally {
       setLoading(false);
+  };
+
+  const handleLocationAutocomplete = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocation(value);
+    if (value.length > 2) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(value)}&format=json&limit=5`,
+          { headers: { 'User-Agent': 'autumhire-job-platform/1.0' } }
+        );
+        const data = await res.json();
+        setLocationSuggestions(data);
+        setShowLocationDropdown(true);
+      } catch (err) {
+        setLocationSuggestions([]);
+        setShowLocationDropdown(false);
+      }
+    } else {
+      setLocationSuggestions([]);
+      setShowLocationDropdown(false);
     }
+  };
+
+  const handleLocationSuggestionClick = (city: { place_id: string; display_name: string }) => {
+    setLocation(city.display_name);
+    setLocationSuggestions([]);
+    setShowLocationDropdown(false);
   };
 
   return (
@@ -141,14 +254,6 @@ const JobForm: React.FC = () => {
       <Card className="shadow-sm">
         <Card.Body>
           <h2 className="text-center mb-4">Post a New Job</h2>
-          <Alert variant="info" className="mb-4 text-center">
-            <strong>Selected Plan:</strong> {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)}
-          </Alert>
-          {selectedPlan !== 'free' && (
-            <Alert variant="warning" className="mb-4 text-center">
-              <strong>Payment Simulation:</strong> This is a simulated payment for the {selectedPlan} plan. (No real payment required.)
-            </Alert>
-          )}
           
           {error && <Alert variant="danger">{error}</Alert>}
           {success && <Alert variant="success">{success}</Alert>}
@@ -159,13 +264,13 @@ const JobForm: React.FC = () => {
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Company Name</Form.Label>
-                  <Form.Control value={companyName} readOnly required />
+                  <Form.Control value={companyName} onChange={e => setCompanyName(e.target.value)} required />
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Industry</Form.Label>
-                  <Form.Control value={industry} readOnly required />
+                  <Form.Control value={industry} onChange={e => setIndustry(e.target.value)} required />
                 </Form.Group>
               </Col>
             </Row>
@@ -173,13 +278,30 @@ const JobForm: React.FC = () => {
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Location</Form.Label>
-                  <Form.Control value={location}  required placeholder="city, country" />
+                  <div style={{ position: 'relative' }}>
+                    <Form.Control
+                      value={location}
+                      required
+                      placeholder="city, country"
+                      onChange={handleLocationAutocomplete}
+                      autoComplete="off"
+                    />
+                    {showLocationDropdown && locationSuggestions.length > 0 && (
+                      <ul style={{ position: 'absolute', zIndex: 10, background: 'white', width: '100%', border: '1px solid #ccc', maxHeight: 180, overflowY: 'auto', margin: 0, padding: 0, listStyle: 'none' }}>
+                        {locationSuggestions.map(city => (
+                          <li key={city.place_id} onClick={() => handleLocationSuggestionClick(city)} style={{ padding: '8px', cursor: 'pointer' }}>
+                            {city.display_name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Website</Form.Label>
-                  <Form.Control value={website} />
+                  <Form.Control value={website} onChange={e => setWebsite(e.target.value)} />
                 </Form.Group>
               </Col>
             </Row>
@@ -209,7 +331,24 @@ const JobForm: React.FC = () => {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
-              <Form.Control as="textarea" rows={4} value={description} onChange={e => setDescription(e.target.value)} required />
+              <RichTextEditor
+                value={description}
+                onChange={setDescription}
+                placeholder="Enter detailed job description, requirements, and responsibilities..."
+                height="250px"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Application Link</Form.Label>
+              <Form.Control
+                type="url"
+                placeholder="https://example.com/apply or your company careers page"
+                value={applicationLink}
+                onChange={e => setApplicationLink(e.target.value)}
+              />
+              <Form.Text className="text-muted">
+                Optional: Provide a direct link where candidates can apply for this position.
+              </Form.Text>
             </Form.Group>
             <Row>
               <Col md={6}>
@@ -262,10 +401,10 @@ const JobForm: React.FC = () => {
                   <DatePicker
                     selected={deadline}
                     onChange={date => setDeadline(date)}
-                    dateFormat="yyyy-MM-dd"
+                    dateFormat="dd/MM/yy"
                     minDate={new Date()}
                     className="form-control"
-                    placeholderText="Select a deadline"
+                    placeholderText="Select a deadline (DD/MM/YY)"
                     required
                   />
                 </Form.Group>
@@ -273,10 +412,28 @@ const JobForm: React.FC = () => {
             </Row>
             <div className="text-center mt-4">
               <Button 
-                variant="primary" 
                 type="submit" 
                 disabled={loading}
                 className="px-5"
+                style={{
+                  backgroundColor: 'var(--pumpkin-orange)',
+                  borderColor: 'var(--pumpkin-orange)',
+                  color: 'white'
+                }}
+                onMouseEnter={(e) => {
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = 'var(--golden-yellow)';
+                    e.currentTarget.style.borderColor = 'var(--golden-yellow)';
+                    e.currentTarget.style.color = 'var(--charcoal-gray)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = 'var(--pumpkin-orange)';
+                    e.currentTarget.style.borderColor = 'var(--pumpkin-orange)';
+                    e.currentTarget.style.color = 'white';
+                  }
+                }}
               >
                 {loading ? 'Posting...' : 'Post Job'}
               </Button>
@@ -284,6 +441,110 @@ const JobForm: React.FC = () => {
           </Form>
         </Card.Body>
       </Card>
+
+      {/* Plan Selection Modal */}
+      <Modal show={showPlanModal} onHide={() => setShowPlanModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Choose Your Job Posting Plan</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="plan-options">
+            <div className="mb-3">
+              <Form.Check
+                type="radio"
+                name="plan"
+                id="free-plan"
+                label={
+                  <div>
+                    <strong>Free Plan</strong>
+                    <div className="text-muted small">
+                      • Basic listing for 15 days<br/>
+                      • Standard visibility<br/>
+                      • No cost
+                    </div>
+                  </div>
+                }
+                value="free"
+                checked={selectedPlan === 'free'}
+                onChange={(e) => setSelectedPlan(e.target.value as 'free')}
+              />
+            </div>
+            
+            <div className="mb-3">
+              <Form.Check
+                type="radio"
+                name="plan"
+                id="standard-plan"
+                label={
+                  <div>
+                    <strong>Standard Plan - $75</strong>
+                    <div className="text-muted small">
+                      • Enhanced visibility for 30 days<br/>
+                      • Email notifications to subscribers<br/>
+                      • Better search ranking
+                    </div>
+                  </div>
+                }
+                value="standard"
+                checked={selectedPlan === 'standard'}
+                onChange={(e) => setSelectedPlan(e.target.value as 'standard')}
+              />
+            </div>
+            
+            <div className="mb-3">
+              <Form.Check
+                type="radio"
+                name="plan"
+                id="premium-plan"
+                label={
+                  <div>
+                    <strong>Premium Plan - $120</strong>
+                    <div className="text-muted small">
+                      • Featured listing for 30 days<br/>
+                      • Top of search results<br/>
+                      • Priority email notifications<br/>
+                      • Company logo highlighting
+                    </div>
+                  </div>
+                }
+                value="premium"
+                checked={selectedPlan === 'premium'}
+                onChange={(e) => setSelectedPlan(e.target.value as 'premium')}
+              />
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowPlanModal(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handlePlanSelection} 
+            disabled={loading}
+            style={{
+              backgroundColor: 'var(--pumpkin-orange)',
+              borderColor: 'var(--pumpkin-orange)',
+              color: 'white'
+            }}
+            onMouseEnter={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = 'var(--golden-yellow)';
+                e.currentTarget.style.borderColor = 'var(--golden-yellow)';
+                e.currentTarget.style.color = 'var(--charcoal-gray)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = 'var(--pumpkin-orange)';
+                e.currentTarget.style.borderColor = 'var(--pumpkin-orange)';
+                e.currentTarget.style.color = 'white';
+              }
+            }}
+          >
+            {selectedPlan === 'free' ? 'Post Job (Free)' : `Continue to Payment ($${selectedPlan === 'standard' ? '75' : '120'})`}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

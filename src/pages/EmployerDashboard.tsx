@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Button, Card, Alert, Spinner, Collapse, Row, Col, Badge, Modal, Form, Table } from 'react-bootstrap';
-import { getAuth, signOut } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { formatFirestoreTimestamp } from '../utils/dateFormatter';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import RichTextEditor from '../components/RichTextEditor';
 import './EmployerDashboard.css';
 
 interface Job {
   id: string;
   title: string;
   description: string;
+  applicationLink?: string;
   location: string;
   salary: string;
   jobType: string;
@@ -18,6 +23,8 @@ interface Job {
   companyLogo?: string;
   experienceLevel?: string;
   postedBy: string;
+  industry?: string;
+  status?: string; // Added status field
 }
 
 interface UserData {
@@ -38,6 +45,10 @@ interface CompanyUser {
   email: string;
   role: "super" | "normal";
 }
+
+const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary', 'Hybrid'];
+const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'INR', 'CAD', 'AUD', 'JPY', 'CNY'];
+const experienceLevels = ['Entry Level', 'Mid Level', 'Senior Level', 'Executive'];
 
 const EmployerDashboard: React.FC = () => {
   const auth = getAuth();
@@ -63,6 +74,27 @@ const EmployerDashboard: React.FC = () => {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [userManagementError, setUserManagementError] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<{ place_id: string; display_name: string }[]>([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
+  // Job editing state
+  const [showEditJobModal, setShowEditJobModal] = useState(false);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [editJobData, setEditJobData] = useState({
+    title: '',
+    description: '',
+    applicationLink: '',
+    location: '',
+    salary: '',
+    salaryCurrency: currencies[0],
+    jobType: jobTypes[0],
+    experienceLevel: experienceLevels[0],
+    deadline: null as Date | null,
+    industry: ''
+  });
+  const [editJobError, setEditJobError] = useState('');
+  const [editJobLoading, setEditJobLoading] = useState(false);
+  const [showUserManagementModal, setShowUserManagementModal] = useState(false);
 
   const fetchCompanyUsers = async (companyId: string) => {
     const usersQuery = query(collection(db, "users"), where("companyId", "==", companyId));
@@ -144,10 +176,7 @@ const EmployerDashboard: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate('/login');
-  };
+
 
   const handleCompanyEdit = () => {
     if (!isSuperUser) return;
@@ -163,6 +192,10 @@ const EmployerDashboard: React.FC = () => {
     } else {
       navigate('/payment-sim');
     }
+  };
+
+  const handlePostNewJob = () => {
+    navigate('/job-form');
   };
 
   const handleAddUser = async () => {
@@ -200,31 +233,164 @@ const EmployerDashboard: React.FC = () => {
 
   const normalUsersCount = companyUsers.filter(u => u.role === 'normal').length;
 
+  const handleLocationAutocomplete = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEditingCompany(prev => prev ? { ...prev, location: value } : null);
+    if (value.length > 2) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(value)}&format=json&limit=5`,
+          { headers: { 'User-Agent': 'autumhire-job-platform/1.0' } }
+        );
+        const data = await res.json();
+        setLocationSuggestions(data);
+        setShowLocationDropdown(true);
+    } catch (err) {
+        setLocationSuggestions([]);
+        setShowLocationDropdown(false);
+      }
+    } else {
+      setLocationSuggestions([]);
+      setShowLocationDropdown(false);
+    }
+  };
+
+  const handleLocationSuggestionClick = (city: { place_id: string; display_name: string }) => {
+    setEditingCompany(prev => prev ? { ...prev, location: city.display_name } : null);
+    setLocationSuggestions([]);
+    setShowLocationDropdown(false);
+  };
+
+  const handleEditJob = (job: Job) => {
+    setEditingJob(job);
+    
+    // Parse salary to extract currency and amount
+    const salaryParts = job.salary.split(' ');
+    const currency = salaryParts[0] || currencies[0];
+    const amount = salaryParts.slice(1).join(' ') || '';
+    
+    // Parse deadline
+    let deadline = null;
+    if (job.deadline && job.deadline.seconds) {
+      deadline = new Date(job.deadline.seconds * 1000);
+    }
+    
+    setEditJobData({
+      title: job.title,
+      description: job.description,
+      applicationLink: job.applicationLink || '',
+      location: job.location,
+      salary: amount,
+      salaryCurrency: currency,
+      jobType: job.jobType,
+      experienceLevel: job.experienceLevel || experienceLevels[0],
+      deadline: deadline,
+      industry: job.industry || ''
+    });
+    
+    setEditJobError('');
+    setShowEditJobModal(true);
+  };
+
+  const handleUpdateJob = async () => {
+    if (!editingJob) return;
+    
+    setEditJobLoading(true);
+    setEditJobError('');
+    
+    try {
+      const jobRef = doc(db, 'jobs', editingJob.id);
+      
+      const updateData: any = {
+        title: editJobData.title,
+        description: editJobData.description,
+        applicationLink: editJobData.applicationLink,
+        location: editJobData.location,
+        salary: `${editJobData.salaryCurrency} ${editJobData.salary}`,
+        jobType: editJobData.jobType,
+        experienceLevel: editJobData.experienceLevel,
+        industry: editJobData.industry
+      };
+      
+      // Handle deadline
+      if (editJobData.deadline) {
+        updateData.deadline = { seconds: Math.floor(editJobData.deadline.getTime() / 1000) };
+      }
+      
+      await updateDoc(jobRef, updateData);
+      
+      // Update local state
+      setJobs(jobs.map(job => 
+        job.id === editingJob.id 
+          ? { ...job, ...updateData }
+          : job
+      ));
+      
+      setShowEditJobModal(false);
+      setEditingJob(null);
+      setSuccessMessage('Job updated successfully!');
+      
+    } catch (err) {
+      console.error('Error updating job:', err);
+      setEditJobError('Failed to update job. Please try again.');
+    } finally {
+      setEditJobLoading(false);
+    }
+  };
+
   if (!user) {
     return <Container className="py-5"><Alert variant="danger">You must be logged in to view the dashboard.</Alert></Container>;
   }
 
   return (
     <Container className="py-5">
-      <div className="mb-4 align-items-center">
+      <div className="mb-4 align-items-center d-flex justify-content-between">
         <h2>Employer Dashboard</h2>
-        <div className="text-end">
-          <Button 
-            variant="secondary" 
-            className="me-2" 
-            onClick={() => setShowPlanModal(true)}
-            disabled={!!userData && (userData as any).isActive === false}
-          >
-            Post a New Job
-          </Button>
-          <Button variant="danger" onClick={handleLogout}>Logout</Button>
+        <div className="d-flex flex-column align-items-end">
+          <div className="mb-2">
+            <span>Need help? Send an email to{' '}
+              <a href="mailto:support@autumhire.com" style={{ color: 'var(--pumpkin-orange)', fontWeight: 600 }}>
+                 support@autumhire.com
+              </a>
+            </span>
+          </div>
+          <div className="text-end">
+            <Button 
+              variant="secondary" 
+              className="me-2" 
+              onClick={handlePostNewJob}
+              disabled={!!userData && (userData as any).isActive === false}
+            >
+              Post a New Job
+            </Button>
+            {isSuperUser && (
+              <Button 
+                variant="success" 
+                onClick={() => setShowUserManagementModal(true)}
+              >
+                User Management
+              </Button>
+            )}
+          </div>
         </div>
       </div>
       
       {/* Inactive account message */}
       {userData && (userData as any).isActive === false && (
         <Alert variant="warning" className="mb-4">
-          Account is inactive. Waiting for admin to activate. This may take up to 24 hours.
+          {(() => {
+            const createdAt = (userData as any).createdAt;
+            if (!createdAt) return "Account is inactive.";
+            const createdDate = new Date(createdAt.seconds * 1000);
+            const today = new Date();
+            const isToday =
+              createdDate.getFullYear() === today.getFullYear() &&
+              createdDate.getMonth() === today.getMonth() &&
+              createdDate.getDate() === today.getDate();
+            return isToday
+              ? "Account is inactive. Waiting for admin to activate. This may take up to 24 hours."
+              : "Your account has been deactivated by an admin. Please contact support for more information.";
+          })()}
         </Alert>
       )}
       
@@ -278,16 +444,30 @@ const EmployerDashboard: React.FC = () => {
                   )}
                 </div>
                 {isSuperUser && (
-                  <div>
-                    <Button 
-                      variant="outline-primary" 
-                      size="sm" 
-                      className="me-2"
-                      onClick={handleCompanyEdit}
-                    >
-                      Edit Company
-                    </Button>
-                  </div>
+                <div>
+                  <Button 
+                    size="sm" 
+                    className="me-2"
+                    onClick={handleCompanyEdit}
+                    style={{
+                      backgroundColor: 'var(--pumpkin-orange)',
+                      borderColor: 'var(--pumpkin-orange)',
+                      color: 'white'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--golden-yellow)';
+                      e.currentTarget.style.borderColor = 'var(--golden-yellow)';
+                      e.currentTarget.style.color = 'var(--charcoal-gray)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--pumpkin-orange)';
+                      e.currentTarget.style.borderColor = 'var(--pumpkin-orange)';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                  >
+                    Edit Company
+                  </Button>
+              </div>
                 )}
               </div>
             </Col>
@@ -320,11 +500,23 @@ const EmployerDashboard: React.FC = () => {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Location</Form.Label>
+              <div style={{ position: 'relative' }}>
               <Form.Control
                 type="text"
                 value={editingCompany?.location || ''}
-                onChange={(e) => setEditingCompany(prev => prev ? { ...prev, location: e.target.value } : null)}
-              />
+                  onChange={handleLocationAutocomplete}
+                  autoComplete="off"
+                />
+                {showLocationDropdown && locationSuggestions.length > 0 && (
+                  <ul style={{ position: 'absolute', zIndex: 10, background: 'white', width: '100%', border: '1px solid #ccc', maxHeight: 180, overflowY: 'auto', margin: 0, padding: 0, listStyle: 'none' }}>
+                    {locationSuggestions.map(city => (
+                      <li key={city.place_id} onClick={() => handleLocationSuggestionClick(city)} style={{ padding: '8px', cursor: 'pointer' }}>
+                        {city.display_name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Website</Form.Label>
@@ -406,8 +598,13 @@ const EmployerDashboard: React.FC = () => {
                   style={{ width: 60, height: 60, objectFit: 'contain', marginRight: 20, borderRadius: 8 }}
                 />
                 <div style={{ flex: 1 }}>
-                  <h5 className="mb-1">
+                  <h5 className="mb-1 d-flex align-items-center">
                     {job.title}
+                    {job.status === 'deactivated_by_admin' ? (
+                      <span className="badge bg-danger ms-2">Deactivated by admin</span>
+                    ) : (
+                      <span className="badge bg-success ms-2">Active</span>
+                    )}
                   </h5>
                   <div className="text-muted mb-1">
                     <strong>Type:</strong> {job.jobType} &nbsp;|&nbsp;
@@ -417,17 +614,25 @@ const EmployerDashboard: React.FC = () => {
                   </div>
                   {job.deadline && job.deadline.seconds && (
                     <div className="text-muted mb-1">
-                      <strong>Deadline:</strong> {new Date(job.deadline.seconds * 1000).toLocaleDateString()}
+                      <strong>Deadline:</strong> {formatFirestoreTimestamp(job.deadline)}
                     </div>
                   )}
                 </div>
                 <div className="d-flex gap-2">
                   <Button
-                    variant="outline-primary"
+                    variant="outline-success"
                     size="sm"
                     onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
                   >
                     {expandedJobId === job.id ? 'Hide' : 'View More'}
+                  </Button>
+                  <Button
+                    variant="outline-warning"
+                    size="sm"
+                    onClick={() => handleEditJob(job)}
+                    disabled={!isSuperUser && job.postedBy !== user?.uid}
+                  >
+                    Edit
                   </Button>
                   <Button
                     variant="danger"
@@ -443,7 +648,23 @@ const EmployerDashboard: React.FC = () => {
                 <div>
                   <Card.Body>
                     <strong>Description:</strong>
-                    <div style={{ whiteSpace: 'pre-line' }}>{job.description}</div>
+                    <div 
+                      style={{ whiteSpace: 'pre-line' }}
+                      dangerouslySetInnerHTML={{ __html: job.description }}
+                    />
+                    {(job as any).applicationLink && (
+                      <div className="mt-3">
+                        <strong>Application Link:</strong>{' '}
+                        <a href={(job as any).applicationLink} target="_blank" rel="noopener noreferrer">
+                          {(job as any).applicationLink}
+                        </a>
+                      </div>
+                    )}
+                    {(job as any).industry && (
+                      <div className="mt-2">
+                        <strong>Industry:</strong> {(job as any).industry}
+                      </div>
+                    )}
                   </Card.Body>
                 </div>
               </Collapse>
@@ -452,23 +673,230 @@ const EmployerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* User Management Section */}
-      {isSuperUser && (
-        <Card className="mb-4">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">User Management</h5>
+
+
+      {/* Add User Modal */}
+      <Modal show={showAddUserModal} onHide={() => setShowAddUserModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add a New User</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>An invitation will be sent. The user must sign up with this exact email to join your company.</p>
+          <Form.Control
+            type="email"
+            placeholder="Enter user's email"
+            value={newUserEmail}
+            onChange={(e) => setNewUserEmail(e.target.value)}
+          />
+          {userManagementError && <Alert variant="danger" className="mt-3">{userManagementError}</Alert>}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowAddUserModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handleAddUser}>Send Invitation</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Edit Job Modal */}
+      <Modal show={showEditJobModal} onHide={() => setShowEditJobModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Job</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {editJobError && <Alert variant="danger">{editJobError}</Alert>}
+          <Form>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Job Title *</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editJobData.title}
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Enter job title"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Industry</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editJobData.industry}
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, industry: e.target.value }))}
+                    placeholder="Enter industry"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+                         <Form.Group className="mb-3">
+               <Form.Label>Job Description *</Form.Label>
+               <RichTextEditor
+                 value={editJobData.description}
+                 onChange={(value) => setEditJobData(prev => ({ ...prev, description: value }))}
+                 placeholder="Enter detailed job description, requirements, and responsibilities..."
+                 height="250px"
+               />
+             </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Application Link</Form.Label>
+              <Form.Control
+                type="url"
+                value={editJobData.applicationLink}
+                onChange={(e) => setEditJobData(prev => ({ ...prev, applicationLink: e.target.value }))}
+                placeholder="https://example.com/apply"
+              />
+            </Form.Group>
+
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Location *</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editJobData.location}
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, location: e.target.value }))}
+                    placeholder="Enter job location"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Job Type *</Form.Label>
+                  <Form.Select 
+                    value={editJobData.jobType} 
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, jobType: e.target.value }))}
+                  >
+                    {jobTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={4}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Currency</Form.Label>
+                  <Form.Select 
+                    value={editJobData.salaryCurrency} 
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, salaryCurrency: e.target.value }))}
+                  >
+                    {currencies.map(currency => (
+                      <option key={currency} value={currency}>{currency}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={8}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Salary</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editJobData.salary}
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, salary: e.target.value }))}
+                    placeholder="e.g., 50,000 - 70,000 per year"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Experience Level</Form.Label>
+                  <Form.Select 
+                    value={editJobData.experienceLevel} 
+                    onChange={(e) => setEditJobData(prev => ({ ...prev, experienceLevel: e.target.value }))}
+                  >
+                    {experienceLevels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Deadline</Form.Label>
+                  <DatePicker
+                    selected={editJobData.deadline}
+                    onChange={(date) => setEditJobData(prev => ({ ...prev, deadline: date }))}
+                    dateFormat="dd/MM/yy"
+                    minDate={new Date()}
+                    className="form-control"
+                    placeholderText="Select a deadline (DD/MM/YY)"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button 
+            variant="secondary" 
+            onClick={() => setShowEditJobModal(false)}
+            disabled={editJobLoading}
+          >
+            Cancel
+          </Button>
               <Button
                 variant="primary"
-                onClick={() => setShowAddUserModal(true)}
+            onClick={handleUpdateJob}
+            disabled={editJobLoading || !editJobData.title || !editJobData.description || !editJobData.location}
+          >
+            {editJobLoading ? 'Updating...' : 'Update Job'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* User Management Modal */}
+      <Modal 
+        show={showUserManagementModal} 
+        onHide={() => setShowUserManagementModal(false)} 
+        size="xl"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>User Management</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h6 className="mb-0">Manage Company Users</h6>
+            <Button
+              onClick={() => {
+                setShowAddUserModal(true);
+                setShowUserManagementModal(false);
+              }}
                 disabled={normalUsersCount >= 5}
+              style={{
+                backgroundColor: 'var(--pumpkin-orange)',
+                borderColor: 'var(--pumpkin-orange)',
+                color: 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.backgroundColor = 'var(--golden-yellow)';
+                  e.currentTarget.style.borderColor = 'var(--golden-yellow)';
+                  e.currentTarget.style.color = 'var(--charcoal-gray)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.backgroundColor = 'var(--pumpkin-orange)';
+                  e.currentTarget.style.borderColor = 'var(--pumpkin-orange)';
+                  e.currentTarget.style.color = 'white';
+                }
+              }}
               >
                 Add User
               </Button>
             </div>
-            <hr />
             {normalUsersCount >= 5 && <Alert variant="warning">You have reached the maximum of 5 normal users.</Alert>}
-            <Table striped bordered hover size="sm" className="mt-3">
+          <Table striped bordered hover size="sm">
               <thead>
                 <tr>
                   <th>Email</th>
@@ -500,28 +928,11 @@ const EmployerDashboard: React.FC = () => {
                 ))}
               </tbody>
             </Table>
-          </Card.Body>
-        </Card>
-      )}
-
-      {/* Add User Modal */}
-      <Modal show={showAddUserModal} onHide={() => setShowAddUserModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add a New User</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>An invitation will be sent. The user must sign up with this exact email to join your company.</p>
-          <Form.Control
-            type="email"
-            placeholder="Enter user's email"
-            value={newUserEmail}
-            onChange={(e) => setNewUserEmail(e.target.value)}
-          />
-          {userManagementError && <Alert variant="danger" className="mt-3">{userManagementError}</Alert>}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowAddUserModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={handleAddUser}>Send Invitation</Button>
+          <Button variant="secondary" onClick={() => setShowUserManagementModal(false)}>
+            Close
+          </Button>
         </Modal.Footer>
       </Modal>
     </Container>

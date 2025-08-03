@@ -1,8 +1,67 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // USERS
+    match /users/{userId} {
+      allow read: if true; // Allow reading for duplicate checking during signup
+      allow create: if isSignedIn() && request.auth.uid == userId; // Users can create their own document
+      allow update, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+
+    // COMPANIES
+    match /companies/{companyId} {
+      allow read: if true; // Already allows all reads
+      allow create: if isSignedIn() && request.auth.uid == companyId; // Users can create their own company
+      allow update, delete: if isAdmin() || (request.auth != null && request.auth.uid == companyId);
+    }
+
+    // JOBS
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create: if isEmployer();
+      allow update, delete: if isAdmin() || (isEmployer() && resource.data.postedBy == request.auth.uid);
+    }
+
+    // INDUSTRIES
+    match /industries/{industryId} {
+      allow read: if true; // Anyone can read industries (for subscribe form)
+      allow create, update, delete: if isAdmin(); // Only admins can manage industries
+    }
+
+    // INVITATIONS
+    match /invitations/{inviteId} {
+      allow create: if isEmployer();
+      allow read, delete: if isSignedIn(); // Allow authenticated users to read invitations during signup
+    }
+
+    // JOB ALERT SUBSCRIBERS
+    match /job_alert_subscribers/{subscriberId} {
+      allow create: if true; // Anyone can subscribe
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Default: Deny all
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'admin@autumhire.com';
+    }
+    
+    function isEmployer() {
+      return isSignedIn() && (
+        isAdmin() || 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'normal')
+      );
     }
   }
 } 

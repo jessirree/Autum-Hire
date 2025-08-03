@@ -1,10 +1,12 @@
 // src/components/Navbar.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navbar, Nav, Button, Container } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { signOut } from "firebase/auth";
 import { getAuth } from "firebase/auth";
+import { db } from "../firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import "./NavBar.css";
 
 const CustomNavbar: React.FC = () => {
@@ -12,6 +14,29 @@ const CustomNavbar: React.FC = () => {
   const { currentUser } = useAuth();
   const auth = getAuth();
   const [search, setSearch] = useState("");
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Fetch user role when currentUser changes
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (currentUser) {
+        try {
+          const userQuery = query(collection(db, 'users'), where('email', '==', currentUser.email));
+          const userSnapshot = await getDocs(userQuery);
+          if (!userSnapshot.empty) {
+            const userData = userSnapshot.docs[0].data();
+            setUserRole(userData.role);
+          }
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+        }
+      } else {
+        setUserRole(null);
+      }
+    };
+
+    fetchUserRole();
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -24,10 +49,16 @@ const CustomNavbar: React.FC = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('NavBar search submitted:', search.trim());
     if (search.trim()) {
       navigate(`/jobs?keywords=${encodeURIComponent(search.trim())}`);
       setSearch("");
     }
+  };
+
+  const handleNavClick = (path: string) => {
+    console.log('NavBar navigation clicked:', path);
+    navigate(path);
   };
 
   return (
@@ -57,20 +88,24 @@ const CustomNavbar: React.FC = () => {
               <Button variant="outline-success" type="submit">Search</Button>
             </form>
           <Nav className="ms-auto align-items-center">
-            <Nav.Link as={Link} to="/" className="mx-2">Home</Nav.Link>
-            <Nav.Link as={Link} to="/jobs" className="mx-2">Job Listings</Nav.Link>
-            <Nav.Link as={Link} to="/post-job" className="mx-2">Post a Job</Nav.Link>
-            <Nav.Link as={Link} to="/about" className="mx-2">About us</Nav.Link>
-            <Nav.Link as={Link} to="/contact" className="mx-2">Contact</Nav.Link>
+            <Nav.Link onClick={() => handleNavClick('/')} className="mx-2" style={{ cursor: 'pointer' }}>Home</Nav.Link>
+            <Nav.Link onClick={() => handleNavClick('/jobs')} className="mx-2" style={{ cursor: 'pointer' }}>Job Listings</Nav.Link>
+            <Nav.Link onClick={() => handleNavClick('/post-job')} className="mx-2" style={{ cursor: 'pointer' }}>Post a Job</Nav.Link>
+            <Nav.Link onClick={() => handleNavClick('/about')} className="mx-2" style={{ cursor: 'pointer' }}>About us</Nav.Link>
+            <Nav.Link onClick={() => handleNavClick('/contact')} className="mx-2" style={{ cursor: 'pointer' }}>Contact</Nav.Link>
             {currentUser ? (
               <>
-                <Nav.Link as={Link} to="/employer-dashboard" className="mx-2">Dashboard</Nav.Link>
+                <Nav.Link 
+                  onClick={() => handleNavClick(userRole === 'admin' ? '/admin' : '/employer-dashboard')}
+                  className="mx-2"
+                  style={{ cursor: 'pointer' }}
+                >
+                  Dashboard
+                </Nav.Link>
                 <Button variant="outline-danger" onClick={handleLogout} className="ms-3 px-4">Logout</Button>
               </>
             ) : (
-              <Link to="/login" className="text-decoration-none">
-                <Button variant="warning" className="ms-3 px-4">Log In</Button>
-              </Link>
+              <Button variant="warning" onClick={() => handleNavClick('/auth')} className="ms-3 px-4">Log In</Button>
             )}
           </Nav>
           </div>
