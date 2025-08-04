@@ -47,6 +47,19 @@ const JobForm: React.FC = () => {
   const [userData, setUserData] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingJobData, setPendingJobData] = useState<any>(null);
+  const [autofilledFields, setAutofilledFields] = useState<{
+    companyName: boolean;
+    industry: boolean;
+    location: boolean;
+    website: boolean;
+    logoUrl: boolean;
+  }>({
+    companyName: false,
+    industry: false,
+    location: false,
+    website: false,
+    logoUrl: false
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +71,38 @@ const JobForm: React.FC = () => {
       }
     };
     fetchUserData();
+  }, [user]);
+
+  // Fetch and autofill company details
+  useEffect(() => {
+    if (!user) return;
+    const fetchCompanyData = async () => {
+      try {
+        const companyRef = doc(db, 'companies', user.uid);
+        const companyDoc = await getDoc(companyRef);
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data();
+          // Autofill company details but keep them editable
+          setCompanyName(companyData.name || '');
+          setIndustry(companyData.industry || '');
+          setLocation(companyData.location || '');
+          setWebsite(companyData.website || '');
+          setLogoUrl(companyData.logoUrl || '');
+          
+          // Track which fields were autofilled
+          setAutofilledFields({
+            companyName: !!companyData.name,
+            industry: !!companyData.industry,
+            location: !!companyData.location,
+            website: !!companyData.website,
+            logoUrl: !!companyData.logoUrl
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching company data:', err);
+      }
+    };
+    fetchCompanyData();
   }, [user]);
 
   if (!user) {
@@ -309,17 +354,58 @@ const JobForm: React.FC = () => {
 
           <Form onSubmit={handleSubmit}>
             <h5 className="mb-3 mt-2">Company Details</h5>
+            <small className="text-muted mb-3 d-block">
+              Company details are pre-filled from your profile but can be edited for this specific job posting.
+            </small>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Company Name</Form.Label>
-                  <Form.Control value={companyName} onChange={e => setCompanyName(e.target.value)} required />
+                  <Form.Control 
+                    value={companyName} 
+                    onChange={e => {
+                      setCompanyName(e.target.value);
+                      // If user manually changes the field, remove it from autofilled state
+                      if (autofilledFields.companyName && e.target.value !== companyName) {
+                        setAutofilledFields(prev => ({ ...prev, companyName: false }));
+                      }
+                    }} 
+                    required 
+                    style={{ 
+                      backgroundColor: autofilledFields.companyName ? '#f8f9fa' : 'white',
+                      borderColor: autofilledFields.companyName ? '#dee2e6' : '#ced4da'
+                    }}
+                  />
+                  {autofilledFields.companyName && (
+                    <Form.Text className="text-muted">
+                      Pre-filled from your company profile
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Industry</Form.Label>
-                  <Form.Control value={industry} onChange={e => setIndustry(e.target.value)} required />
+                  <Form.Control 
+                    value={industry} 
+                    onChange={e => {
+                      setIndustry(e.target.value);
+                      // If user manually changes the field, remove it from autofilled state
+                      if (autofilledFields.industry && e.target.value !== industry) {
+                        setAutofilledFields(prev => ({ ...prev, industry: false }));
+                      }
+                    }} 
+                    required 
+                    style={{ 
+                      backgroundColor: autofilledFields.industry ? '#f8f9fa' : 'white',
+                      borderColor: autofilledFields.industry ? '#dee2e6' : '#ced4da'
+                    }}
+                  />
+                  {autofilledFields.industry && (
+                    <Form.Text className="text-muted">
+                      Pre-filled from your company profile
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Col>
             </Row>
@@ -332,8 +418,18 @@ const JobForm: React.FC = () => {
                       value={location}
                       required
                       placeholder="city, country"
-                      onChange={handleLocationAutocomplete}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        handleLocationAutocomplete(e);
+                        // If user manually changes the field, remove it from autofilled state
+                        if (autofilledFields.location && e.target.value !== location) {
+                          setAutofilledFields(prev => ({ ...prev, location: false }));
+                        }
+                      }}
                       autoComplete="off"
+                      style={{ 
+                        backgroundColor: autofilledFields.location ? '#f8f9fa' : 'white',
+                        borderColor: autofilledFields.location ? '#dee2e6' : '#ced4da'
+                      }}
                     />
                     {showLocationDropdown && locationSuggestions.length > 0 && (
                       <ul style={{ position: 'absolute', zIndex: 10, background: 'white', width: '100%', border: '1px solid #ccc', maxHeight: 180, overflowY: 'auto', margin: 0, padding: 0, listStyle: 'none' }}>
@@ -345,12 +441,35 @@ const JobForm: React.FC = () => {
                       </ul>
                     )}
                   </div>
+                  {autofilledFields.location && (
+                    <Form.Text className="text-muted">
+                      Pre-filled from your company profile
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Website</Form.Label>
-                  <Form.Control value={website} onChange={e => setWebsite(e.target.value)} />
+                  <Form.Control 
+                    value={website} 
+                    onChange={e => {
+                      setWebsite(e.target.value);
+                      // If user manually changes the field, remove it from autofilled state
+                      if (autofilledFields.website && e.target.value !== website) {
+                        setAutofilledFields(prev => ({ ...prev, website: false }));
+                      }
+                    }} 
+                    style={{ 
+                      backgroundColor: autofilledFields.website ? '#f8f9fa' : 'white',
+                      borderColor: autofilledFields.website ? '#dee2e6' : '#ced4da'
+                    }}
+                  />
+                  {autofilledFields.website && (
+                    <Form.Text className="text-muted">
+                      Pre-filled from your company profile
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Col>
             </Row>
@@ -360,8 +479,23 @@ const JobForm: React.FC = () => {
                 type="url"
                 placeholder="https://example.com/logo.png"
                 value={logoUrl}
-                onChange={e => setLogoUrl(e.target.value)}
+                onChange={e => {
+                  setLogoUrl(e.target.value);
+                  // If user manually changes the field, remove it from autofilled state
+                  if (autofilledFields.logoUrl && e.target.value !== logoUrl) {
+                    setAutofilledFields(prev => ({ ...prev, logoUrl: false }));
+                  }
+                }}
+                style={{ 
+                  backgroundColor: autofilledFields.logoUrl ? '#f8f9fa' : 'white',
+                  borderColor: autofilledFields.logoUrl ? '#dee2e6' : '#ced4da'
+                }}
               />
+              {autofilledFields.logoUrl && (
+                <Form.Text className="text-muted">
+                  Pre-filled from your company profile
+                </Form.Text>
+              )}
               {logoUrl && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(logoUrl) && (
                 <div className="mt-2">
                   <img

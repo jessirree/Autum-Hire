@@ -7,7 +7,7 @@ import {
   checkSTKPushStatus, 
   generateTransactionReference, 
   validatePhoneNumber 
-} from './mpesa.js';
+} from './instasend.js';
 
 // Initialize Firebase Admin with environment variables
 if (!admin.apps.length) {
@@ -175,7 +175,7 @@ app.post('/send-contact-message', async (req, res) => {
 // M-Pesa Payment Endpoints
 
 // Initiate STK Push payment
-app.post('/api/mpesa/initiate-payment', async (req, res) => {
+app.post('/api/instasend/initiate-payment', async (req, res) => {
   const { phoneNumber, amount, plan, jobId } = req.body;
   
   if (!phoneNumber || !amount || !plan) {
@@ -230,7 +230,7 @@ app.post('/api/mpesa/initiate-payment', async (req, res) => {
 });
 
 // Check payment status
-app.post('/api/mpesa/check-status', async (req, res) => {
+app.post('/api/instasend/check-status', async (req, res) => {
   const { checkoutRequestID } = req.body;
   
   if (!checkoutRequestID) {
@@ -278,7 +278,7 @@ app.post('/api/mpesa/check-status', async (req, res) => {
 });
 
 // M-Pesa callback endpoint
-app.post('/api/mpesa/callback', async (req, res) => {
+app.post('/api/instasend/callback', async (req, res) => {
   try {
     const { Body: { stkCallback } } = req.body;
     
@@ -318,5 +318,16 @@ app.post('/api/mpesa/callback', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`)); 
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+  console.log(`Railway URL: ${process.env.RAILWAY_PUBLIC_DOMAIN || 'Not set'}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Available endpoints:`);
+  console.log(`  - POST /send-job-alert`);
+  console.log(`  - POST /send-contact-message`);
+  console.log(`  - POST /notify-job-posted`);
+  console.log(`  - POST /api/mpesa/initiate-payment`);
+  console.log(`  - POST /api/mpesa/check-status`);
+  console.log(`  - POST /api/mpesa/callback`);
+}); 

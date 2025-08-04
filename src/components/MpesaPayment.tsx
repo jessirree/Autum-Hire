@@ -33,7 +33,7 @@ const MpesaPayment: React.FC<MpesaPaymentProps> = ({
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/mpesa/initiate-payment`, {
+      const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/instasend/initiate-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,7 +70,7 @@ const MpesaPayment: React.FC<MpesaPaymentProps> = ({
 
     const checkStatus = async () => {
       try {
-        const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/mpesa/check-status`, {
+        const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/instasend/check-status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
