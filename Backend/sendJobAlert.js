@@ -31,7 +31,15 @@ const firestore = admin.firestore();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Allow requests from your frontend
+app.use(cors({
+  origin: ['https://autumhire.com', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Nodemailer transporter for job alerts
 const jobAlertsTransporter = nodemailer.createTransport({
