@@ -8,7 +8,9 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import dayjs from 'dayjs';
 import RichTextEditor from '../components/RichTextEditor';
+import MpesaPayment from '../components/MpesaPayment';
 import { API_ENDPOINTS } from '../config/api';
+import toast from 'react-hot-toast';
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary', 'Hybrid', 'Graduate Trainee'];
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'INR', 'CAD', 'AUD', 'JPY', 'CNY'];
@@ -44,6 +46,8 @@ const JobForm: React.FC = () => {
   const [locationSuggestions, setLocationSuggestions] = useState<{ place_id: string; display_name: string }[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [userData, setUserData] = useState<any>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingJobData, setPendingJobData] = useState<any>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -105,7 +109,7 @@ const JobForm: React.FC = () => {
       // Handle payment flow first if not free
       if (selectedPlan !== 'free') {
         // Store form data temporarily
-        sessionStorage.setItem('tempJobData', JSON.stringify({
+        const jobData = {
           title,
           description,
           applicationLink,
@@ -117,10 +121,10 @@ const JobForm: React.FC = () => {
           deadline: deadline?.toISOString(),
           plan: selectedPlan,
           industry
-        }));
-        
-        // Navigate to payment simulation
-        navigate('/payment-sim');
+        };
+        setPendingJobData(jobData);
+        setShowPaymentModal(true);
+        setLoading(false);
         return;
       }
 
@@ -151,6 +155,8 @@ const JobForm: React.FC = () => {
       let jobDeadline = deadline;
       if (selectedPlan === 'free') {
         jobDeadline = dayjs().add(15, 'day').toDate();
+      } else if (selectedPlan === 'standard' || selectedPlan === 'premium') {
+        jobDeadline = dayjs().add(30, 'day').toDate();
       }
 
       // Create job document with plan info
@@ -169,8 +175,17 @@ const JobForm: React.FC = () => {
         createdAt: serverTimestamp(),
         status: 'active',
         plan: selectedPlan,
-        paymentStatus: selectedPlan === 'free' ? 'not_required' : 'simulated_paid',
+        paymentStatus: selectedPlan === 'free' ? 'not_required' : 'paid',
         industry,
+        // Plan-specific features
+        features: {
+          isFeatured: selectedPlan === 'premium',
+          isEnhanced: selectedPlan === 'standard' || selectedPlan === 'premium',
+          hasEmailNotifications: selectedPlan === 'standard' || selectedPlan === 'premium',
+          hasPrioritySupport: selectedPlan === 'standard' || selectedPlan === 'premium',
+          hasTopSearchResults: selectedPlan === 'premium',
+          listingDuration: selectedPlan === 'free' ? 15 : 30
+        }
       });
 
       const jobId = jobRef.id;
@@ -247,6 +262,42 @@ const JobForm: React.FC = () => {
     setLocation(city.display_name);
     setLocationSuggestions([]);
     setShowLocationDropdown(false);
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (!pendingJobData) return;
+    
+    setLoading(true);
+    try {
+      // Restore form data from pending job data
+      const data = pendingJobData;
+      setTitle(data.title);
+      setDescription(data.description);
+      setApplicationLink(data.applicationLink);
+      setLocation(data.location);
+      setSalary(data.salary);
+      setSalaryCurrency(data.salaryCurrency);
+      setJobType(data.jobType);
+      setExperienceLevel(data.experienceLevel);
+      setDeadline(data.deadline ? new Date(data.deadline) : null);
+      setIndustry(data.industry);
+      setSelectedPlan(data.plan);
+      
+      // Submit the job with paid status
+      await submitJob();
+      
+      toast.success('Job posted successfully after payment!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to post job after payment');
+      toast.error('Failed to post job after payment');
+    } finally {
+      setLoading(false);
+      setPendingJobData(null);
+    }
+  };
+
+  const getPlanAmount = (plan: 'standard' | 'premium') => {
+    return plan === 'standard' ? 7500 : 12000; // Amount in KES
   };
 
   return (
@@ -545,6 +596,20 @@ const JobForm: React.FC = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* M-Pesa Payment Modal */}
+      {pendingJobData && (
+        <MpesaPayment
+          show={showPaymentModal}
+          onHide={() => {
+            setShowPaymentModal(false);
+            setPendingJobData(null);
+          }}
+          plan={pendingJobData.plan}
+          amount={getPlanAmount(pendingJobData.plan)}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
     </Container>
   );
 };

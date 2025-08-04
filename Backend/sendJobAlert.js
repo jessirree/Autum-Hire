@@ -2,6 +2,12 @@ import express from 'express';
 import nodemailer from 'nodemailer';
 import cors from 'cors';
 import admin from 'firebase-admin';
+import { 
+  initiateSTKPush, 
+  checkSTKPushStatus, 
+  generateTransactionReference, 
+  validatePhoneNumber 
+} from './mpesa.js';
 
 // Initialize Firebase Admin with environment variables
 if (!admin.apps.length) {
@@ -163,6 +169,152 @@ app.post('/send-contact-message', async (req, res) => {
   } catch (err) {
     console.error('Error sending contact form email:', err);
     res.status(500).json({ error: 'Failed to send message. Please try again later.' });
+  }
+});
+
+// M-Pesa Payment Endpoints
+
+// Initiate STK Push payment
+app.post('/api/mpesa/initiate-payment', async (req, res) => {
+  const { phoneNumber, amount, plan, jobId } = req.body;
+  
+  if (!phoneNumber || !amount || !plan) {
+    return res.status(400).json({ error: 'Phone number, amount, and plan are required.' });
+  }
+
+  // Validate phone number
+  const validatedPhone = validatePhoneNumber(phoneNumber);
+  if (!validatedPhone) {
+    return res.status(400).json({ error: 'Invalid phone number format. Please use Kenyan format (e.g., 0712345678 or 254712345678).' });
+  }
+
+  try {
+    const reference = generateTransactionReference();
+    
+    // Store payment attempt in Firestore
+    await firestore.collection('payment_attempts').doc(reference).set({
+      phoneNumber: validatedPhone,
+      amount: parseInt(amount),
+      plan,
+      jobId,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      checkoutRequestID: null
+    });
+
+    // Initiate STK Push
+    const stkResponse = await initiateSTKPush(validatedPhone, amount, reference);
+    
+    if (stkResponse.success) {
+      // Update payment attempt with checkout request ID
+      await firestore.collection('payment_attempts').doc(reference).update({
+        checkoutRequestID: stkResponse.checkoutRequestID
+      });
+
+      res.json({
+        success: true,
+        checkoutRequestID: stkResponse.checkoutRequestID,
+        reference,
+        message: 'Payment initiated. Please check your phone for M-Pesa prompt.'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: stkResponse.error
+      });
+    }
+  } catch (error) {
+    console.error('Payment initiation error:', error);
+    res.status(500).json({ error: 'Failed to initiate payment. Please try again.' });
+  }
+});
+
+// Check payment status
+app.post('/api/mpesa/check-status', async (req, res) => {
+  const { checkoutRequestID } = req.body;
+  
+  if (!checkoutRequestID) {
+    return res.status(400).json({ error: 'Checkout request ID is required.' });
+  }
+
+  try {
+    const statusResponse = await checkSTKPushStatus(checkoutRequestID);
+    
+    if (statusResponse.success) {
+      const resultCode = statusResponse.data.ResultCode;
+      
+      if (resultCode === '0') {
+        // Payment successful
+        res.json({
+          success: true,
+          status: 'completed',
+          message: 'Payment completed successfully!'
+        });
+      } else if (resultCode === '1') {
+        // Payment failed
+        res.json({
+          success: false,
+          status: 'failed',
+          message: 'Payment failed. Please try again.'
+        });
+      } else {
+        // Still pending
+        res.json({
+          success: false,
+          status: 'pending',
+          message: 'Payment is still being processed. Please wait.'
+        });
+      }
+    } else {
+      res.status(400).json({
+        success: false,
+        error: statusResponse.error
+      });
+    }
+  } catch (error) {
+    console.error('Payment status check error:', error);
+    res.status(500).json({ error: 'Failed to check payment status.' });
+  }
+});
+
+// M-Pesa callback endpoint
+app.post('/api/mpesa/callback', async (req, res) => {
+  try {
+    const { Body: { stkCallback } } = req.body;
+    
+    if (stkCallback.ResultCode === '0') {
+      // Payment successful
+      const { CheckoutRequestID, MerchantRequestID, ResultCode, ResultDesc } = stkCallback;
+      
+      // Update payment status in Firestore
+      const paymentQuery = await firestore.collection('payment_attempts')
+        .where('checkoutRequestID', '==', CheckoutRequestID)
+        .get();
+      
+      if (!paymentQuery.empty) {
+        const paymentDoc = paymentQuery.docs[0];
+        await paymentDoc.ref.update({
+          status: 'completed',
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          mpesaResponse: stkCallback
+        });
+        
+        // Update job payment status if jobId exists
+        const paymentData = paymentDoc.data();
+        if (paymentData.jobId) {
+          await firestore.collection('jobs').doc(paymentData.jobId).update({
+            paymentStatus: 'paid',
+            paymentReference: paymentDoc.id,
+            paidAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('M-Pesa callback error:', error);
+    res.status(500).json({ error: 'Callback processing failed' });
   }
 });
 

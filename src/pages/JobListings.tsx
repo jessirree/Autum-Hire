@@ -184,15 +184,6 @@ const JobListings: React.FC = () => {
     return filtered;
   };
 
-  const getDaysAgo = (timestamp: any) => {
-    if (!timestamp || !timestamp.seconds) return 'Unknown';
-    const jobDate = new Date(timestamp.seconds * 1000);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - jobDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return `${diffDays} Day${diffDays !== 1 ? 's' : ''} Ago`;
-  };
-
   // Apply filters
   const displayedJobs = applyFilters(jobs);
   const selectedJob = displayedJobs.find(job => job.id === selectedJobId);
