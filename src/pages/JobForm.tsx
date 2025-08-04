@@ -10,7 +10,6 @@ import dayjs from 'dayjs';
 import RichTextEditor from '../components/RichTextEditor';
 import MpesaPayment from '../components/MpesaPayment';
 import { API_ENDPOINTS } from '../config/api';
-import toast from 'react-hot-toast';
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary', 'Hybrid', 'Graduate Trainee'];
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'INR', 'CAD', 'AUD', 'JPY', 'CNY'];
@@ -286,10 +285,9 @@ const JobForm: React.FC = () => {
       // Submit the job with paid status
       await submitJob();
       
-      toast.success('Job posted successfully after payment!');
+      setSuccess('Job posted successfully after payment!');
     } catch (err: any) {
       setError(err.message || 'Failed to post job after payment');
-      toast.error('Failed to post job after payment');
     } finally {
       setLoading(false);
       setPendingJobData(null);
