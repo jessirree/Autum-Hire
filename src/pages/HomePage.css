@@ -186,10 +186,71 @@ body {
 .wide-modal .modal-dialog {
   max-width: 80vw !important;
   width: 80vw !important;
+  z-index: 9999 !important;
 }
 
 .wide-modal .modal-content {
   width: 100%;
+  z-index: 9999 !important;
+}
+
+.wide-modal .modal-backdrop {
+  z-index: 9998 !important;
+}
+
+/* Ensure modal appears above navbar and all other elements */
+.wide-modal {
+  z-index: 9999 !important;
+}
+
+.wide-modal .modal {
+  z-index: 9999 !important;
+}
+
+.wide-modal .modal.show {
+  z-index: 9999 !important;
+}
+
+/* Fix modal content spacing - aggressive approach */
+.wide-modal .modal-body {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.wide-modal .modal-body .row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.wide-modal .modal-body .col-md-8 {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.wide-modal .modal-body .col-md-8 > div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.wide-modal .modal-body .col-md-8 > div:last-child > div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Ensure no extra space at bottom of modal */
+.wide-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.wide-modal .modal-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Remove any default Bootstrap margins/padding that might cause gaps */
+.wide-modal .modal-body *:last-child {
+  margin-bottom: 0 !important;
 }
 
 @media (max-width: 768px) {

@@ -200,8 +200,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   return (
-    <div className="rich-text-editor-custom">
-      {/* Toolbar */}
+    <div className="rich-text-editor-custom" style={{ height: height, display: 'flex', flexDirection: 'column' }}>
+      {/* Toolbar - Fixed at top */}
       <div className="toolbar" style={{
         border: '1px solid #ced4da',
         borderBottom: 'none',
@@ -210,8 +210,28 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         padding: '8px',
         display: 'flex',
         flexWrap: 'wrap',
-        gap: '4px'
+        gap: '4px',
+        flexShrink: 0,
+        zIndex: 10
       }}>
+        {/* Undo / Redo */}
+        <ButtonGroup size="sm">
+          <Button
+            variant="outline-secondary"
+            onClick={() => execCommand('undo')}
+            title="Undo (Ctrl+Z)"
+          >
+            ↶ Undo
+          </Button>
+          <Button
+            variant="outline-secondary"
+            onClick={() => execCommand('redo')}
+            title="Redo (Ctrl+Y)"
+          >
+            ↷ Redo
+          </Button>
+        </ButtonGroup>
+        
         {/* Text Formatting */}
         <ButtonGroup size="sm">
           <Button
@@ -338,31 +358,41 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         </ButtonGroup>
       </div>
 
-      {/* Editor */}
-      <div
-        ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onPaste={handlePaste}
-        onKeyDown={handleKeyDown}
-        suppressContentEditableWarning={true}
-        style={{
-          minHeight: height,
-          border: '1px solid #ced4da',
-          borderRadius: '0 0 8px 8px',
-          padding: '12px',
-          outline: 'none',
-          backgroundColor: '#fff',
-          fontSize: '14px',
-          lineHeight: '1.6',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          borderColor: isEditorFocused ? '#0d6efd' : '#ced4da',
-          boxShadow: isEditorFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
-          cursor: 'text'
-        }}
-      />
+      {/* Editor - Scrollable content area */}
+      <div style={{
+        flex: 1,
+        border: '1px solid #ced4da',
+        borderRadius: '0 0 8px 8px',
+        backgroundColor: '#fff',
+        borderColor: isEditorFocused ? '#0d6efd' : '#ced4da',
+        boxShadow: isEditorFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        <div
+          ref={editorRef}
+          contentEditable
+          onInput={handleInput}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          suppressContentEditableWarning={true}
+          style={{
+            height: '100%',
+            padding: '12px',
+            outline: 'none',
+            fontSize: '14px',
+            lineHeight: '1.6',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            cursor: 'text',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word'
+          }}
+        />
+      </div>
 
       {/* Placeholder logic */}
       {!value && !isEditorFocused && (
@@ -370,11 +400,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           style={{
             position: 'absolute',
             top: '50px', // Height of toolbar + border
-            left: '13px', // Border + padding
+            left: '25px', // Border + padding
             color: '#6c757d',
             pointerEvents: 'none',
             fontSize: '14px',
-            fontFamily: 'system-ui, -apple-system, sans-serif'
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 5
           }}
         >
           {placeholder}
@@ -384,6 +415,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       <style>{`
         .rich-text-editor-custom {
           position: relative;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .rich-text-editor-custom .toolbar {
+          flex-shrink: 0;
+          position: sticky;
+          top: 0;
+          z-index: 10;
         }
         
         .rich-text-editor-custom [contenteditable] {

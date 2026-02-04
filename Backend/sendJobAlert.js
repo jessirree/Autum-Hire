@@ -32,27 +32,10 @@ const firestore = admin.firestore();
 const app = express();
 app.use(express.json());
 
-// More comprehensive CORS configuration
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://autumhire.com');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
-// Also keep the cors middleware as backup
+// Simple CORS configuration
 app.use(cors({
-  origin: ['https://autumhire.com', 'http://localhost:5173', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: true, // Allow all origins for now
+  credentials: true
 }));
 
 // Nodemailer transporter for job alerts
@@ -82,7 +65,14 @@ const subscribers = [];
 
 // Test endpoint to verify CORS is working
 app.get('/test', (req, res) => {
+  console.log('Test endpoint called');
   res.json({ message: 'Backend is working!', timestamp: new Date().toISOString() });
+});
+
+// Debug endpoint for CORS testing
+app.post('/debug', (req, res) => {
+  console.log('Debug endpoint called with body:', req.body);
+  res.json({ message: 'Debug endpoint working!', body: req.body });
 });
 
 app.post('/send-job-alert', async (req, res) => {

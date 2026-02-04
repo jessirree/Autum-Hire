@@ -5,11 +5,14 @@ import './App.css'
 import App from './App.tsx'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { HelmetProvider } from 'react-helmet-async';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HelmetProvider>
-      <App />
+      <NotificationProvider>
+        <App />
+      </NotificationProvider>
     </HelmetProvider>
-  </StrictMode>,
+  </StrictMode>
 )

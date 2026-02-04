@@ -1,5 +1,5 @@
 // src/pages/HomePage.tsx
-import { FaSearch, FaChevronLeft, FaChevronRight, FaBell } from "react-icons/fa";
+import { FaSearch, FaChevronLeft, FaChevronRight, FaBell, FaClock, FaCalendarAlt } from "react-icons/fa";
 import { Modal, Button } from 'react-bootstrap';
 import { Helmet } from 'react-helmet-async';
 
@@ -8,7 +8,8 @@ import './HomePage.css';
 import { useNavigate } from 'react-router-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc as firestoreDoc, query, orderBy } from 'firebase/firestore';
+import { formatFirestoreTimestamp } from '../utils/dateFormatter';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,12 +21,27 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedJobs = async () => {
       // Fetch jobs
-      const jobsSnapshot = await getDocs(collection(db, 'jobs'));
+      const jobsSnapshot = await getDocs(query(collection(db, 'jobs'), orderBy('createdAt', 'desc')));
       const jobs: any[] = [];
-      jobsSnapshot.forEach(doc => {
+      
+      for (const doc of jobsSnapshot.docs) {
         const job: any = { id: doc.id, ...doc.data() };
-          jobs.push(job);
-      });
+        
+        // Fetch user email for the job poster
+        if (job.postedBy) {
+          try {
+              const userDoc = await getDoc(firestoreDoc(db, 'users', job.postedBy));
+            if (userDoc.exists()) {
+              job.postedByEmail = userDoc.data().email;
+            }
+          } catch (error) {
+            console.error('Error fetching user email:', error);
+          }
+        }
+        
+        jobs.push(job);
+      }
+      
       setFeaturedJobs(jobs);
     };
     fetchFeaturedJobs();
@@ -149,10 +165,12 @@ const HomePage: React.FC = () => {
             }}
             className="hide-scrollbar"
           >
-            {featuredJobs.filter(job => job.status === 'active').length === 0 ? (
+            {featuredJobs.filter(job => job.status === 'active' && job.plan !== 'free').length === 0 ? (
               <div className="text-muted">No featured jobs available.</div>
             ) : (
-              featuredJobs.filter(job => job.status === 'active').map((job, index) => (
+              featuredJobs
+                .filter(job => job.status === 'active' && job.plan !== 'free')
+                .map((job, index) => (
                 <div key={job.id || index} style={{ minWidth: 300, maxWidth: 340 }} className="position-relative">
                   <div className="text-center p-4 shadow-sm rounded h-100" style={{ background: 'white' }}>
                     <img
@@ -162,10 +180,41 @@ const HomePage: React.FC = () => {
                     />
                     <h5 className="fw-bold mb-3">{job.title}</h5>
                     <div className="text-muted">
-                      <p className="mb-2">{job.companyName}</p>
-                      <p className="mb-2"><i className="fas fa-map-marker-alt me-2"></i>{job.location}</p>
-                      <p className="mb-2"><i className="fas fa-money-bill me-2"></i>{job.salary}</p>
-                      <p className="mb-0"><i className="fas fa-briefcase me-2"></i>{job.jobType}</p>
+                      <p className="mb-2">
+                        {(() => {
+                          console.log('Featured job data:', {
+                            title: job.title,
+                            postedByEmail: job.postedByEmail,
+                            formCompanyName: job.formCompanyName,
+                            companyName: job.companyName,
+                            isJobalerts: job.postedByEmail === 'jobalerts@autumhire.com'
+                          });
+                          return job.postedByEmail === 'jobalerts@autumhire.com' 
+                            ? job.formCompanyName || job.companyName 
+                            : job.companyName;
+                        })()}
+                      </p>
+                      <p className="mb-2">
+                        <i className="fas fa-map-marker-alt me-2"></i>
+                        {job.postedByEmail === 'jobalerts@autumhire.com' 
+                          ? job.formLocation || job.location 
+                          : job.location}
+                      </p>
+                      {job.salary && job.salary.trim() !== '' && /[0-9]/.test(job.salary) && (
+                        <p className="mb-2"><i className="fas fa-money-bill me-2"></i>{job.salary}</p>
+                      )}
+                      {job.createdAt && (
+                        <p className="mb-2" style={{ fontSize: '14px' }}>
+                          <FaClock className="me-2" style={{ fontSize: '12px' }} />
+                          Posted: {formatFirestoreTimestamp(job.createdAt)}
+                        </p>
+                      )}
+                      {job.deadline && (
+                        <p className="mb-0" style={{ fontSize: '14px' }}>
+                          <FaCalendarAlt className="me-2" style={{ fontSize: '12px' }} />
+                          Closing: {formatFirestoreTimestamp(job.deadline)}
+                        </p>
+                      )}
                     </div>
                     <button
                       className="btn featured-job-view-details-btn w-100 mt-3"
@@ -190,41 +239,68 @@ const HomePage: React.FC = () => {
       </div>
 
       {/* Job Details Modal */}
-      <Modal show={!!selectedJob} onHide={() => setSelectedJob(null)} centered size="xl" className="wide-modal">
+      <Modal 
+        show={!!selectedJob} 
+        onHide={() => setSelectedJob(null)} 
+        centered 
+        size="xl" 
+        className="wide-modal"
+        style={{ zIndex: 9999 }}
+        backdropStyle={{ zIndex: 9998 }}
+      >
         <Modal.Header>
-          <Modal.Title>Job Details</Modal.Title>
-          <Button variant="close" aria-label="Close" onClick={() => setSelectedJob(null)} style={{ position: 'absolute', right: 16, top: 16, fontSize: 24, background: 'none', border: 'none' }}>
-            &times;
-          </Button>
+            <div className="d-flex justify-content-between align-items-center w-100">
+              <Modal.Title>Job Details</Modal.Title>
+              <div className="d-flex align-items-center">
+                {selectedJob?.applicationLink && (
+                  <a 
+                    href={selectedJob.applicationLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="btn btn-sm me-2"
+                    style={{ 
+                      backgroundColor: 'white',
+                      borderColor: 'var(black)',
+                      color: 'var(black)',
+                      fontWeight: '600'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F5E6D3';
+                      e.currentTarget.style.borderColor = '#F5E6D3';
+                      e.currentTarget.style.color = 'var(--pumpkin-orange)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white';
+                      e.currentTarget.style.borderColor = 'var(--pumpkin-orange)';
+                      e.currentTarget.style.color = 'var(--pumpkin-orange)';
+                    }}
+                    onClick={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F5E6D3';
+                      e.currentTarget.style.borderColor = '#F5E6D3';
+                      e.currentTarget.style.color = 'var(--pumpkin-orange)';
+                    }}
+                  >
+                    Apply Now
+                  </a>
+                )}
+                <Button variant="close" aria-label="Close" onClick={() => setSelectedJob(null)} style={{ fontSize: 24, background: 'none', border: 'none' }}>
+                  &times;
+                </Button>
+              </div>
+            </div>
         </Modal.Header>
-        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto', padding: '1rem 1rem 0 1rem' }}>
           {selectedJob && (
-            <div className="row">
-              <div className="col-md-8">
+            <div className="row" style={{ marginBottom: 0 }}>
+              <div className="col-md-8" style={{ paddingBottom: 0 }}>
                 <h5 className="mb-3">{selectedJob.title}</h5>
-                <div className="mb-4">
+                <div>
                   <h6>Job Description</h6>
                   <div 
                     style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}
                     dangerouslySetInnerHTML={{ __html: selectedJob.description }}
                   />
                 </div>
-                {selectedJob.applicationLink && (
-                  <div className="mb-4">
-                    <a 
-                      href={selectedJob.applicationLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="btn btn-primary btn-lg"
-                      style={{ 
-                        backgroundColor: 'var(--pumpkin-orange)',
-                        borderColor: 'var(--pumpkin-orange)'
-                      }}
-                    >
-                      Apply Now
-                    </a>
-                  </div>
-                )}
               </div>
               <div className="col-md-4">
                 <div className="card h-100" style={{ backgroundColor: 'var(--background-alt)', border: 'none' }}>
@@ -232,7 +308,11 @@ const HomePage: React.FC = () => {
                     <h6 className="card-title mb-3">Job Details</h6>
                     <div className="mb-3">
                       <small className="text-muted">Company</small>
-                      <p className="mb-0 fw-bold">{selectedJob.companyName}</p>
+                      <p className="mb-0 fw-bold">
+                        {selectedJob.postedByEmail === 'jobalerts@autumhire.com' 
+                          ? selectedJob.formCompanyName || selectedJob.companyName 
+                          : selectedJob.companyName}
+                      </p>
                     </div>
                     <div className="mb-3">
                       <small className="text-muted">Salary</small>
@@ -248,13 +328,40 @@ const HomePage: React.FC = () => {
                     </div>
                     <div className="mb-3">
                       <small className="text-muted">Location</small>
-                      <p className="mb-0">{selectedJob.location}</p>
+                      <p className="mb-0">
+                        {selectedJob.postedByEmail === 'jobalerts@autumhire.com' 
+                          ? selectedJob.formLocation || selectedJob.location 
+                          : selectedJob.location}
+                      </p>
                     </div>
-              {selectedJob.website && (
+                    {selectedJob.applicationLink && (
+                      <div className="mb-3">
+                        <a 
+                          href={selectedJob.applicationLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="btn btn-primary btn-lg w-100"
+                          style={{ 
+                            backgroundColor: 'var(--pumpkin-orange)',
+                            borderColor: 'var(--pumpkin-orange)'
+                          }}
+                        >
+                          Apply Now
+                        </a>
+                      </div>
+                    )}
+              {(selectedJob.website || (selectedJob.postedByEmail === 'jobalerts@autumhire.com' && selectedJob.formWebsite)) && (
                       <div className="mb-3">
                         <small className="text-muted">Company Website</small>
                         <p className="mb-0">
-                          <a href={selectedJob.website} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                          <a 
+                            href={selectedJob.postedByEmail === 'jobalerts@autumhire.com' 
+                              ? selectedJob.formWebsite || selectedJob.website 
+                              : selectedJob.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-decoration-none"
+                          >
                             Visit Website
                           </a>
                         </p>

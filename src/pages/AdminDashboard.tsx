@@ -32,7 +32,7 @@ const AdminDashboard: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [showJobModal, setShowJobModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
-  const [jobAction, setJobAction] = useState<'deactivate' | 'reactivate' | null>(null);
+  const [jobAction, setJobAction] = useState<'deactivate' | 'reactivate' | 'close' | null>(null);
   const [showJobDetailModal, setShowJobDetailModal] = useState(false);
   const [jobDetail, setJobDetail] = useState<any | null>(null);
   const [selectedPanel, setSelectedPanel] = useState<'employers' | 'jobs' | 'industries'>('employers');
@@ -305,10 +305,11 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleJobAction = (job: any) => {
-    setSelectedJob(job);
-    setJobAction(job.status === 'active' ? 'deactivate' : 'reactivate');
-    setShowJobModal(true);
+
+  const handleJobStatusChange = (job: any, action: 'deactivate' | 'reactivate' | 'close') => {
+      setSelectedJob(job);
+      setJobAction(action);
+      setShowJobModal(true);
   };
 
   const confirmJobAction = async () => {
@@ -322,6 +323,10 @@ const AdminDashboard: React.FC = () => {
         await updateDoc(doc(db, 'jobs', selectedJob.id), { status: 'active' });
         setJobs(jobs.map(j => j.id === selectedJob.id ? { ...j, status: 'active' } : j));
         setSuccess('Job reactivated successfully');
+      } else if (jobAction === 'close') {
+          await updateDoc(doc(db, 'jobs', selectedJob.id), { status: 'closed' });
+          setJobs(jobs.map(j => j.id === selectedJob.id ? { ...j, status: 'closed' } : j));
+          setSuccess('Job closed successfully');
       }
     } catch (err) {
       setError('Failed to update job');
@@ -544,7 +549,7 @@ const AdminDashboard: React.FC = () => {
                         <td>{job.title}</td>
                         <td>{job.companyName}</td>
                         <td>
-                          <span className={`badge bg-${job.status === 'active' ? 'success' : 'danger'}`}>
+                          <span className={`badge bg-${job.status === 'active' ? 'success' : job.status === 'closed' ? 'secondary' : 'danger'}`}>
                             {job.status}
                           </span>
                         </td>
@@ -564,10 +569,20 @@ const AdminDashboard: React.FC = () => {
                           <Button
                             variant={job.status === 'active' ? 'warning' : 'success'}
                             size="sm"
-                            onClick={() => handleJobAction(job)}
+                            className="me-2"
+                            onClick={() => handleJobStatusChange(job, job.status === 'active' ? 'deactivate' : 'reactivate')}
                           >
                             {job.status === 'active' ? 'Deactivate' : 'Reactivate'}
                           </Button>
+                          {job.status === 'active' && (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleJobStatusChange(job, 'close')}
+                            >
+                                Close
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -657,12 +672,15 @@ const AdminDashboard: React.FC = () => {
             {jobAction === 'reactivate' && (
               <>Are you sure you want to reactivate this job?</>
             )}
+            {jobAction === 'close' && (
+              <>Are you sure you want to CLOSE this job? This will stop new applications but keep the job visible.</>
+            )}
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowJobModal(false)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={confirmJobAction}>
+            <Button variant={jobAction === 'reactivate' ? 'success' : 'danger'} onClick={confirmJobAction}>
               Confirm
             </Button>
           </Modal.Footer>

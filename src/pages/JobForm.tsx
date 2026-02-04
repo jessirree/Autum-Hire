@@ -3,13 +3,14 @@ import { Container, Form, Button, Alert, Row, Col, Modal, Card } from 'react-boo
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebase';
-import { collection, addDoc, doc, serverTimestamp, getDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc as firestoreDoc, serverTimestamp, getDoc, query, where, getDocs } from 'firebase/firestore';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import dayjs from 'dayjs';
 import RichTextEditor from '../components/RichTextEditor';
 import MpesaPayment from '../components/MpesaPayment';
 import { API_ENDPOINTS } from '../config/api';
+import { useNotification } from '../contexts/NotificationContext';
 
 const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary', 'Hybrid', 'Graduate Trainee'];
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'INR', 'CAD', 'AUD', 'JPY', 'CNY'];
@@ -19,6 +20,7 @@ const JobForm: React.FC = () => {
   const navigate = useNavigate();
   const auth = getAuth();
   const user = auth.currentUser;
+  const { showSuccess, showError } = useNotification();
 
   // Company fields
   const [companyName, setCompanyName] = useState('');
@@ -64,7 +66,7 @@ const JobForm: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const fetchUserData = async () => {
-      const userRef = doc(db, 'users', user.uid);
+      const userRef = firestoreDoc(db, 'users', user.uid);
       const userDoc = await getDoc(userRef);
       if (userDoc.exists()) {
         setUserData(userDoc.data());
@@ -78,7 +80,7 @@ const JobForm: React.FC = () => {
     if (!user) return;
     const fetchCompanyData = async () => {
       try {
-        const companyRef = doc(db, 'companies', user.uid);
+        const companyRef = firestoreDoc(db, 'companies', user.uid);
         const companyDoc = await getDoc(companyRef);
         if (companyDoc.exists()) {
           const companyData = companyDoc.data();
@@ -111,24 +113,13 @@ const JobForm: React.FC = () => {
 
   // Prevent job posting if account is deactivated by admin
   if (userData && userData.isActive === false) {
-    const createdAt = userData.createdAt;
-    if (createdAt) {
-      const createdDate = new Date(createdAt.seconds * 1000);
-      const today = new Date();
-      const isToday =
-        createdDate.getFullYear() === today.getFullYear() &&
-        createdDate.getMonth() === today.getMonth() &&
-        createdDate.getDate() === today.getDate();
-      if (!isToday) {
-        return (
-          <Container className="py-5">
-            <Alert variant="danger">
-              Your account has been deactivated by an admin. You cannot post new jobs. Please contact support for more information.
-            </Alert>
-          </Container>
-        );
-      }
-    }
+    return (
+      <Container className="py-5">
+        <Alert variant="danger">
+          Your account has been deactivated by an admin. You cannot post new jobs. Please contact support for more information.
+        </Alert>
+      </Container>
+    );
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -138,6 +129,7 @@ const JobForm: React.FC = () => {
     // Validate form fields
     if (!title.trim() || !description.trim() || !location.trim()) {
       setError('Please fill in all required fields');
+      try { showError('Please fill in all required fields', 'Validation Error'); } catch {}
       return;
     }
 
@@ -176,6 +168,7 @@ const JobForm: React.FC = () => {
       await submitJob();
     } catch (err: any) {
       setError(err.message || 'Failed to process job posting');
+      try { showError(err.message || 'Failed to process job posting', 'Job Posting Failed'); } catch {}
       setLoading(false);
     }
   };
@@ -185,8 +178,14 @@ const JobForm: React.FC = () => {
       throw new Error('You must be logged in to post a job');
     }
 
+    try {
+      // Get user email to check if it's jobalerts@autumhire.com
+      const userRef = firestoreDoc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      const userEmail = userDoc.exists() ? userDoc.data().email : '';
+
       // Get company data
-      const companyRef = doc(db, 'companies', user.uid);
+      const companyRef = firestoreDoc(db, 'companies', user.uid);
       const companyDoc = await getDoc(companyRef);
       
       if (!companyDoc.exists()) {
@@ -204,7 +203,7 @@ const JobForm: React.FC = () => {
       }
 
       // Create job document with plan info
-      const jobRef = await addDoc(collection(db, 'jobs'), {
+      const jobData: any = {
         title,
         description,
         applicationLink,
@@ -230,40 +229,64 @@ const JobForm: React.FC = () => {
           hasTopSearchResults: selectedPlan === 'premium',
           listingDuration: selectedPlan === 'free' ? 15 : 30
         }
-      });
+      };
+
+      // For jobalerts@autumhire.com, save form data separately for display
+      if (userEmail === 'jobalerts@autumhire.com') {
+        jobData.formCompanyName = companyName;
+        jobData.formLocation = location;
+        jobData.formWebsite = website;
+        jobData.formIndustry = industry;
+        jobData.formLogoUrl = logoUrl;
+      }
+
+      console.log('Creating job with data:', jobData);
+      const jobRef = await addDoc(collection(db, 'jobs'), jobData);
+      console.log('Job created successfully with ID:', jobRef.id);
 
       const jobId = jobRef.id;
 
       // Ensure industry exists in industries collection
       if (industry && industry.trim()) {
-        const industriesRef = collection(db, 'industries');
-        const q = query(industriesRef, where('name', '==', industry.trim()));
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-          await addDoc(industriesRef, { name: industry.trim(), createdAt: new Date() });
+        try {
+          console.log('Checking industry:', industry.trim());
+          const industriesRef = collection(db, 'industries');
+          const q = query(industriesRef, where('name', '==', industry.trim()));
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) {
+            console.log('Adding new industry:', industry.trim());
+            await addDoc(industriesRef, { name: industry.trim(), createdAt: new Date() });
+            console.log('Industry added successfully');
+          } else {
+            console.log('Industry already exists');
+          }
+        } catch (industryError) {
+          console.error('Industry operation failed:', industryError);
+          // Don't throw - job posting should still succeed
         }
       }
 
       // Notify subscribers if plan is standard or premium
       if (selectedPlan === 'standard' || selectedPlan === 'premium') {
-      try {
-        const notifyUrl = `${window.location.origin}`;
-        await fetch(API_ENDPOINTS.NOTIFY_JOB_POSTED, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            industry,
-            url: notifyUrl,
-            plan: selectedPlan,
-            jobId
-          })
-        });
-        console.log('Job notification sent successfully');
-      } catch (notifyError) {
-        console.warn('Failed to send job notifications (backend not available):', notifyError);
-        // Don't throw the error - job posting should still succeed
-      }
+        try {
+          console.log('Sending job notification for plan:', selectedPlan);
+          const notifyUrl = `${window.location.origin}`;
+          await fetch(API_ENDPOINTS.NOTIFY_JOB_POSTED, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              industry,
+              url: notifyUrl,
+              plan: selectedPlan,
+              jobId
+            })
+          });
+          console.log('Job notification sent successfully');
+        } catch (notifyError) {
+          console.warn('Failed to send job notifications (backend not available):', notifyError);
+          // Don't throw the error - job posting should still succeed
+        }
       }
 
       setSuccess('Job posted successfully!');
@@ -278,6 +301,10 @@ const JobForm: React.FC = () => {
       }, 1500);
 
       setLoading(false);
+    } catch (error: any) {
+      console.error('Error in submitJob:', error);
+      throw error; // Re-throw to be handled by the calling function
+    }
   };
 
   const handleLocationAutocomplete = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -333,6 +360,7 @@ const JobForm: React.FC = () => {
       setSuccess('Job posted successfully after payment!');
     } catch (err: any) {
       setError(err.message || 'Failed to post job after payment');
+      try { showError(err.message || 'Failed to post job after payment', 'Job Posting Failed'); } catch {}
     } finally {
       setLoading(false);
       setPendingJobData(null);
@@ -349,8 +377,9 @@ const JobForm: React.FC = () => {
         <Card.Body>
           <h2 className="text-center mb-4">Post a New Job</h2>
           
-          {error && <Alert variant="danger">{error}</Alert>}
-          {success && <Alert variant="success">{success}</Alert>}
+          {/* Inline alerts are replaced by global notifications; keep as fallback if needed */}
+          {/* {error && <Alert variant="danger">{error}</Alert>}
+          {success && <Alert variant="success">{success}</Alert>} */}
 
           <Form onSubmit={handleSubmit}>
             <h5 className="mb-3 mt-2">Company Details</h5>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc as firestoreDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './JobListings.css';
 import { FaBell, FaMapMarkerAlt, FaClock, FaBriefcase, FaCalendarAlt, FaSearch } from 'react-icons/fa';
@@ -30,9 +30,63 @@ const JobListings: React.FC = () => {
         const jobsRef = collection(db, 'jobs');
         const jobsSnapshot = await getDocs(jobsRef);
         const jobsList: any[] = [];
-        jobsSnapshot.forEach(doc => {
-          jobsList.push({ id: doc.id, ...doc.data() });
+        
+        for (const doc of jobsSnapshot.docs) {
+          const job: any = { id: doc.id, ...doc.data() };
+          
+          // Fetch user email for the job poster
+          if (job.postedBy) {
+            try {
+              const userDoc = await getDoc(firestoreDoc(db, 'users', job.postedBy));
+              if (userDoc.exists()) {
+                job.postedByEmail = userDoc.data().email;
+              }
+            } catch (error) {
+              console.error('Error fetching user email:', error);
+            }
+          }
+          
+          jobsList.push(job);
+        }
+        
+        // Sort: premium first, then standard, then free. Within each, latest first by createdAt
+        const score = (plan?: string) => plan === 'premium' ? 0 : plan === 'standard' ? 1 : 2;
+        jobsList.sort((a, b) => {
+          const sa = score(a.plan);
+          const sb = score(b.plan);
+          if (sa !== sb) return sa - sb;
+          const ta = a.createdAt?.seconds ?? 0;
+          const tb = b.createdAt?.seconds ?? 0;
+          return tb - ta; // latest first
         });
+        // Check for expired active jobs and update them to closed
+        const batch = writeBatch(db);
+        let batchCount = 0;
+        const now = new Date();
+
+        jobsList.forEach(job => {
+          if (job.status === 'active' && job.deadline && job.deadline.seconds) {
+            const deadlineDate = new Date(job.deadline.seconds * 1000);
+            if (deadlineDate < now) {
+              // Update local job object
+              job.status = 'closed';
+              // Add to batch update
+              const jobRef = firestoreDoc(db, 'jobs', job.id);
+              batch.update(jobRef, { status: 'closed' });
+              batchCount++;
+            }
+          }
+        });
+
+        if (batchCount > 0) {
+          try {
+            await batch.commit();
+            console.log(`Auto-closed ${batchCount} expired jobs.`);
+          } catch (batchError) {
+            console.error('Error auto-closing expired jobs:', batchError);
+          }
+        }
+
         setJobs(jobsList);
 
         // Fetch companies
@@ -127,8 +181,8 @@ const JobListings: React.FC = () => {
   const applyFilters = (jobs: any[]) => {
     let filtered = [...jobs];
     
-    // Only show jobs with status 'active'
-    filtered = filtered.filter(job => job.status === 'active');
+    // Show jobs with status 'active' OR 'closed'
+    filtered = filtered.filter(job => job.status === 'active' || job.status === 'closed');
     // Sort by job.plan (premium > standard > free), then by most recent
     filtered.sort((a, b) => {
       const aPlan = a.plan || 'free';
@@ -446,11 +500,17 @@ const JobListings: React.FC = () => {
                                 {job.title}
                               </h6>
                               <div className="mb-2" style={{ fontSize: '15px', fontWeight: 500 }}>
-                                {job.companyName}
+                                {job.postedByEmail === 'jobalerts@autumhire.com' 
+  ? job.formCompanyName || job.companyName 
+  : job.companyName}
                               </div>
                               <div className="d-flex align-items-center mb-2 text-muted" style={{ fontSize: '14px' }}>
                                 <FaMapMarkerAlt className="me-2" style={{ fontSize: '12px' }} />
-                                <span>{job.location}</span>
+                                <span>
+  {job.postedByEmail === 'jobalerts@autumhire.com' 
+    ? job.formLocation || job.location 
+    : job.location}
+</span>
                               </div>
                               <div className="d-flex align-items-center mb-2 text-muted" style={{ fontSize: '14px' }}>
                                 <FaClock className="me-2" style={{ fontSize: '12px' }} />
@@ -484,9 +544,9 @@ const JobListings: React.FC = () => {
                                   className="btn btn-sm btn-outline-secondary"
                                   onClick={e => { e.stopPropagation(); setSelectedJobId(job.id); }}
                                 >
-                                  View Details
+                                    View Details
                                 </button>
-                            </div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -499,7 +559,12 @@ const JobListings: React.FC = () => {
                 <div className="col-lg-7 col-md-6">
                   <div className="job-details-panel p-4" style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #ddd' }}>
                     <div className="d-flex justify-content-between align-items-start mb-4">
-                      <h4 className="mb-0">{selectedJob.title}</h4>
+                      <div className="d-flex align-items-center">
+                        <h4 className="mb-0 me-3">{selectedJob.title}</h4>
+                        {selectedJob.status === 'closed' && (
+                          <span className="badge bg-secondary">Closed</span>
+                        )}
+                      </div>
                           <button
                         className="btn btn-close"
                         onClick={() => setSelectedJobId(null)}
@@ -536,12 +601,22 @@ const JobListings: React.FC = () => {
                         Apply
                       </a>
                     )}
+                    
+                    {selectedJob.status === 'closed' && (
+                       <div className="alert alert-secondary mb-4">
+                         This job is currently closed and no longer accepting applications.
+                       </div>
+                    )}
 
                     <div className="row mb-4">
                       <div className="col-md-6">
                         <div className="d-flex align-items-center mb-3">
                           <FaMapMarkerAlt className="me-2 text-muted" />
-                          <span>{selectedJob.location}</span>
+                          <span>
+  {selectedJob.postedByEmail === 'jobalerts@autumhire.com' 
+    ? selectedJob.formLocation || selectedJob.location 
+    : selectedJob.location}
+</span>
                         </div>
                       </div>
                       <div className="col-md-6">
@@ -563,7 +638,10 @@ const JobListings: React.FC = () => {
                         {selectedJob.deadline && (
                           <div className="d-flex align-items-center mb-3">
                             <FaCalendarAlt className="me-2 text-muted" />
-                            <span>End Date: {formatFirestoreTimestamp(selectedJob.deadline)}</span>
+                            <span>
+                              {selectedJob.status === 'closed' ? 'Closed On: ' : 'End Date: '}
+                              {formatFirestoreTimestamp(selectedJob.deadline)}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -663,11 +741,17 @@ const JobListings: React.FC = () => {
                                 {job.title}
                               </h6>
                               <div className="mb-2" style={{ fontSize: '15px', fontWeight: 500 }}>
-                                {job.companyName}
+                                {job.postedByEmail === 'jobalerts@autumhire.com' 
+  ? job.formCompanyName || job.companyName 
+  : job.companyName}
                               </div>
                               <div className="d-flex align-items-center mb-2 text-muted" style={{ fontSize: '14px' }}>
                                 <FaMapMarkerAlt className="me-2" style={{ fontSize: '12px' }} />
-                                <span>{job.location}</span>
+                                <span>
+  {job.postedByEmail === 'jobalerts@autumhire.com' 
+    ? job.formLocation || job.location 
+    : job.location}
+</span>
                               </div>
                               <div className="d-flex align-items-center mb-2 text-muted" style={{ fontSize: '14px' }}>
                                 <FaClock className="me-2" style={{ fontSize: '12px' }} />

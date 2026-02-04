@@ -1,7 +1,6 @@
 // API Configuration
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://fvogm84j.up.railway.app' 
-  : 'http://localhost:3001';
+// API Configuration
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export const API_ENDPOINTS = {
   SEND_JOB_ALERT: `${API_BASE_URL}/send-job-alert`,

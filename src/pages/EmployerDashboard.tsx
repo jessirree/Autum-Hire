@@ -9,6 +9,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import RichTextEditor from '../components/RichTextEditor';
 import './EmployerDashboard.css';
+import { useNotification } from '../contexts/NotificationContext';
 
 interface Job {
   id: string;
@@ -25,6 +26,15 @@ interface Job {
   postedBy: string;
   industry?: string;
   status?: string; // Added status field
+  plan?: 'free' | 'standard' | 'premium';
+  features?: {
+    isFeatured: boolean;
+    isEnhanced: boolean;
+    hasEmailNotifications: boolean;
+    hasPrioritySupport: boolean;
+    hasTopSearchResults: boolean;
+    listingDuration: number;
+  };
 }
 
 interface UserData {
@@ -95,6 +105,17 @@ const EmployerDashboard: React.FC = () => {
   const [editJobError, setEditJobError] = useState('');
   const [editJobLoading, setEditJobLoading] = useState(false);
   const [showUserManagementModal, setShowUserManagementModal] = useState(false);
+  const { showSuccess, showError } = useNotification();
+
+  // Show toast when arriving with a success message (e.g., after posting a job)
+  useEffect(() => {
+    if (successMessage) {
+      try { showSuccess(successMessage, 'Success'); } catch {}
+      // Clear the navigation state so the message doesn't re-trigger on refresh/back
+      navigate(location.pathname, { replace: true, state: {} });
+      setSuccessMessage(null);
+    }
+  }, [successMessage]);
 
   const fetchCompanyUsers = async (companyId: string) => {
     const usersQuery = query(collection(db, "users"), where("companyId", "==", companyId));
@@ -151,6 +172,7 @@ const EmployerDashboard: React.FC = () => {
         setJobs(jobsList);
       } catch (err: any) {
         setError('Failed to fetch jobs.');
+        try { showError('Failed to fetch jobs', 'Error'); } catch {}
       } finally {
         setLoading(false);
       }
@@ -169,10 +191,31 @@ const EmployerDashboard: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'jobs', jobId));
       setJobs(jobs.filter(job => job.id !== jobId));
+      try { showSuccess('Job deleted successfully', 'Job Deleted'); } catch {}
     } catch (err) {
       setError('Failed to delete job.');
+      try { showError('Failed to delete job', 'Error'); } catch {}
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleCloseJob = async (jobId: string) => {
+    const confirmed = window.confirm('Are you sure you want to close this job? It will remain in your list but will be marked as closed.');
+    if (!confirmed) return;
+
+    try {
+      const jobRef = doc(db, 'jobs', jobId);
+      await updateDoc(jobRef, { status: 'closed' });
+      setJobs(jobs.map(job => 
+        job.id === jobId 
+          ? { ...job, status: 'closed' }
+          : job
+      ));
+      try { showSuccess('Job closed successfully', 'Job Closed'); } catch {}
+    } catch (err) {
+      console.error('Error closing job:', err);
+      try { showError('Failed to close job', 'Error'); } catch {}
     }
   };
 
@@ -215,8 +258,10 @@ const EmployerDashboard: React.FC = () => {
       setShowAddUserModal(false);
       setNewUserEmail("");
       setSuccessMessage(`Invitation sent to ${newUserEmail}. They need to sign up with this email.`);
+      try { showSuccess(`Invitation sent to ${newUserEmail}`, 'Invitation Sent'); } catch {}
     } catch (error) {
       setUserManagementError("Failed to send invitation.");
+      try { showError('Failed to send invitation', 'Error'); } catch {}
     }
   };
 
@@ -394,13 +439,14 @@ const EmployerDashboard: React.FC = () => {
         </Alert>
       )}
       
-      {successMessage && (
+      {/* Success banner replaced by bottom-right notifications; keep as fallback if needed */}
+      {/* {successMessage && (
         <Alert variant="success" onClose={() => setSuccessMessage(null)} dismissible>
           {successMessage}
         </Alert>
-      )}
+      )} */}
       
-      {error && <Alert variant="danger">{error}</Alert>}
+      {/* {error && <Alert variant="danger">{error}</Alert>} */}
 
       {/* Company Profile Section */}
       <Card className="mb-4">
@@ -602,6 +648,8 @@ const EmployerDashboard: React.FC = () => {
                     {job.title}
                     {job.status === 'deactivated_by_admin' ? (
                       <span className="badge bg-danger ms-2">Deactivated by admin</span>
+                    ) : job.status === 'closed' ? (
+                      <span className="badge bg-secondary ms-2">Closed</span>
                     ) : (
                       <span className="badge bg-success ms-2">Active</span>
                     )}
@@ -609,8 +657,10 @@ const EmployerDashboard: React.FC = () => {
                   <div className="text-muted mb-1">
                     <strong>Type:</strong> {job.jobType} &nbsp;|&nbsp;
                     <strong>Experience:</strong> {job.experienceLevel || 'N/A'} &nbsp;|&nbsp;
-                    <strong>Location:</strong> {job.location} &nbsp;|&nbsp;
-                    <strong>Salary:</strong> {job.salary}
+                    <strong>Location:</strong> {job.location}
+                    {job.salary && job.salary.trim() !== '' && /[0-9]/.test(job.salary) && (
+                      <> &nbsp;|&nbsp; <strong>Salary:</strong> {job.salary}</>
+                    )}
                   </div>
                   {job.deadline && job.deadline.seconds && (
                     <div className="text-muted mb-1">
@@ -633,6 +683,14 @@ const EmployerDashboard: React.FC = () => {
                     disabled={!isSuperUser && job.postedBy !== user?.uid}
                   >
                     Edit
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => handleCloseJob(job.id)}
+                    disabled={job.status === 'closed' || job.status === 'deactivated_by_admin' || (!isSuperUser && job.postedBy !== user?.uid)}
+                  >
+                    Close
                   </Button>
                   <Button
                     variant="danger"
@@ -729,6 +787,70 @@ const EmployerDashboard: React.FC = () => {
                 </Form.Group>
               </Col>
             </Row>
+
+            {/* Plan upgrade controls */}
+            {editingJob && (
+              <div className="mb-3">
+                <Form.Label>Upgrade Plan</Form.Label>
+                <div className="d-flex gap-2">
+                  <Button
+                    variant="outline-secondary"
+                    disabled={editingJob.plan === 'standard' || editingJob.plan === 'premium'}
+                    onClick={async () => {
+                      if (!editingJob) return;
+                      try {
+                        const jobRef = doc(db, 'jobs', editingJob.id);
+                        await updateDoc(jobRef, {
+                          plan: 'standard',
+                          features: {
+                            isFeatured: false,
+                            isEnhanced: true,
+                            hasEmailNotifications: true,
+                            hasPrioritySupport: true,
+                            hasTopSearchResults: false,
+                            listingDuration: 30
+                          }
+                        });
+                        setJobs(jobs.map(j => j.id === editingJob.id ? { ...j, plan: 'standard', features: { isFeatured: false, isEnhanced: true, hasEmailNotifications: true, hasPrioritySupport: true, hasTopSearchResults: false, listingDuration: 30 } } : j));
+                        try { showSuccess('Job upgraded to Standard', 'Plan Updated'); } catch {}
+                      } catch (e) {
+                        try { showError('Failed to upgrade to Standard', 'Error'); } catch {}
+                      }
+                    }}
+                  >
+                    Upgrade to Standard
+                  </Button>
+                  <Button
+                    variant="outline-primary"
+                    disabled={editingJob.plan === 'premium'}
+                    onClick={async () => {
+                      if (!editingJob) return;
+                      try {
+                        const jobRef = doc(db, 'jobs', editingJob.id);
+                        await updateDoc(jobRef, {
+                          plan: 'premium',
+                          features: {
+                            isFeatured: true,
+                            isEnhanced: true,
+                            hasEmailNotifications: true,
+                            hasPrioritySupport: true,
+                            hasTopSearchResults: true,
+                            listingDuration: 30
+                          }
+                        });
+                        setJobs(jobs.map(j => j.id === editingJob.id ? { ...j, plan: 'premium', features: { isFeatured: true, isEnhanced: true, hasEmailNotifications: true, hasPrioritySupport: true, hasTopSearchResults: true, listingDuration: 30 } } : j));
+                        try { showSuccess('Job upgraded to Premium', 'Plan Updated'); } catch {}
+                      } catch (e) {
+                        try { showError('Failed to upgrade to Premium', 'Error'); } catch {}
+                      }
+                    }}
+                  >
+                    Upgrade to Premium
+                  </Button>
+                </div>
+                <div className="small text-muted mt-1">You can only upgrade plans. Downgrading is not allowed.</div>
+              </div>
+            )}
 
                          <Form.Group className="mb-3">
                <Form.Label>Job Description *</Form.Label>
