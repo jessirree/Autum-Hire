@@ -2,11 +2,11 @@ import express from 'express';
 import nodemailer from 'nodemailer';
 import cors from 'cors';
 import admin from 'firebase-admin';
-import { 
-  initiateSTKPush, 
-  checkSTKPushStatus, 
-  generateTransactionReference, 
-  validatePhoneNumber 
+import {
+  initiateSTKPush,
+  checkSTKPushStatus,
+  generateTransactionReference,
+  validatePhoneNumber
 } from './instasend.js';
 
 // Initialize Firebase Admin with environment variables
@@ -16,7 +16,9 @@ if (!admin.apps.length) {
       type: "service_account",
       project_id: process.env.FIREBASE_PROJECT_ID || "autumhire",
       private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-      private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+      private_key: process.env.FIREBASE_PRIVATE_KEY
+        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '')
+        : undefined,
       client_email: process.env.FIREBASE_CLIENT_EMAIL,
       client_id: process.env.FIREBASE_CLIENT_ID,
       auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -144,11 +146,11 @@ app.post('/notify-job-posted', async (req, res) => {
 // New endpoint to handle contact form submissions
 app.post('/send-contact-message', async (req, res) => {
   const { name, email, subject, message } = req.body;
-  
+
   if (!name || !email || !subject || !message) {
     return res.status(400).json({ error: 'All fields are required.' });
   }
-  
+
   try {
     // Send email to info@autumhire.com
     await infoTransporter.sendMail({
@@ -168,7 +170,7 @@ app.post('/send-contact-message', async (req, res) => {
       `,
       replyTo: email
     });
-    
+
     // Send confirmation email to the sender
     await infoTransporter.sendMail({
       from: '"Autumhire Support" <info@autumhire.com>',
@@ -181,7 +183,7 @@ app.post('/send-contact-message', async (req, res) => {
         <p>Best regards,<br>The Autumhire Team</p>
       `
     });
-    
+
     res.json({ success: true, message: 'Message sent successfully' });
   } catch (err) {
     console.error('Error sending contact form email:', err);
@@ -194,7 +196,7 @@ app.post('/send-contact-message', async (req, res) => {
 // Initiate STK Push payment
 app.post('/api/instasend/initiate-payment', async (req, res) => {
   const { phoneNumber, amount, plan, jobId } = req.body;
-  
+
   if (!phoneNumber || !amount || !plan) {
     return res.status(400).json({ error: 'Phone number, amount, and plan are required.' });
   }
@@ -207,7 +209,7 @@ app.post('/api/instasend/initiate-payment', async (req, res) => {
 
   try {
     const reference = generateTransactionReference();
-    
+
     // Store payment attempt in Firestore
     await firestore.collection('payment_attempts').doc(reference).set({
       phoneNumber: validatedPhone,
@@ -221,7 +223,7 @@ app.post('/api/instasend/initiate-payment', async (req, res) => {
 
     // Initiate STK Push
     const stkResponse = await initiateSTKPush(validatedPhone, amount, reference);
-    
+
     if (stkResponse.success) {
       // Update payment attempt with checkout request ID
       await firestore.collection('payment_attempts').doc(reference).update({
@@ -249,17 +251,17 @@ app.post('/api/instasend/initiate-payment', async (req, res) => {
 // Check payment status
 app.post('/api/instasend/check-status', async (req, res) => {
   const { checkoutRequestID } = req.body;
-  
+
   if (!checkoutRequestID) {
     return res.status(400).json({ error: 'Checkout request ID is required.' });
   }
 
   try {
     const statusResponse = await checkSTKPushStatus(checkoutRequestID);
-    
+
     if (statusResponse.success) {
       const resultCode = statusResponse.data.ResultCode;
-      
+
       if (resultCode === '0') {
         // Payment successful
         res.json({
@@ -298,16 +300,16 @@ app.post('/api/instasend/check-status', async (req, res) => {
 app.post('/api/instasend/callback', async (req, res) => {
   try {
     const { Body: { stkCallback } } = req.body;
-    
+
     if (stkCallback.ResultCode === '0') {
       // Payment successful
       const { CheckoutRequestID, MerchantRequestID, ResultCode, ResultDesc } = stkCallback;
-      
+
       // Update payment status in Firestore
       const paymentQuery = await firestore.collection('payment_attempts')
         .where('checkoutRequestID', '==', CheckoutRequestID)
         .get();
-      
+
       if (!paymentQuery.empty) {
         const paymentDoc = paymentQuery.docs[0];
         await paymentDoc.ref.update({
@@ -315,7 +317,7 @@ app.post('/api/instasend/callback', async (req, res) => {
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
           mpesaResponse: stkCallback
         });
-        
+
         // Update job payment status if jobId exists
         const paymentData = paymentDoc.data();
         if (paymentData.jobId) {
@@ -327,7 +329,7 @@ app.post('/api/instasend/callback', async (req, res) => {
         }
       }
     }
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('M-Pesa callback error:', error);
