@@ -9,6 +9,23 @@ import {
   validatePhoneNumber
 } from './instasend.js';
 
+const getPrivateKey = () => {
+  const key = process.env.FIREBASE_PRIVATE_KEY;
+  if (!key) {
+    console.error('FIREBASE_PRIVATE_KEY is missing');
+    return undefined;
+  }
+
+  console.log('Raw Key Start:', key.substring(0, 10) + '...');
+  console.log('Raw Key Length:', key.length);
+
+  // Remove surrounding quotes and handle newlines
+  const cleanKey = key.replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
+
+  console.log('Cleaned Key Length:', cleanKey.length);
+  return cleanKey;
+};
+
 // Initialize Firebase Admin with environment variables
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -16,9 +33,7 @@ if (!admin.apps.length) {
       type: "service_account",
       project_id: process.env.FIREBASE_PROJECT_ID || "autumhire",
       private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-      private_key: process.env.FIREBASE_PRIVATE_KEY
-        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '')
-        : undefined,
+      private_key: getPrivateKey(),
       client_email: process.env.FIREBASE_CLIENT_EMAIL,
       client_id: process.env.FIREBASE_CLIENT_ID,
       auth_uri: "https://accounts.google.com/o/oauth2/auth",
