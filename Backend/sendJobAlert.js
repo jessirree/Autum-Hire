@@ -66,6 +66,15 @@ const jobAlertsTransporter = nodemailer.createTransport({
   }
 });
 
+// Verify SMTP connection on startup
+jobAlertsTransporter.verify(function (error, success) {
+  if (error) {
+    console.error('SMTP Connection Error (Job Alerts):', error);
+  } else {
+    console.log("SMTP Server is ready to take our messages");
+  }
+});
+
 // Nodemailer transporter for contact form (info@autumhire.com)
 const infoTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.autumhire.com',
@@ -98,19 +107,23 @@ app.post('/debug', (req, res) => {
 });
 
 app.post('/send-job-alert', async (req, res) => {
+  console.log('Received subscription request for:', req.body.email);
   const { email, industries, location } = req.body;
   if (!email || !industries || !Array.isArray(industries) || industries.length === 0) {
     return res.status(400).json({ error: 'Email and at least one industry are required.' });
   }
   try {
     // Save subscriber to Firestore
+    console.log('Saving subscriber to Firestore...');
     await firestore.collection('subscribers').doc(email).set({
       email,
       industries,
       location,
       subscribedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    console.log('Subscriber saved to Firestore.');
 
+    console.log('Attempting to send subscription email...');
     await jobAlertsTransporter.sendMail({
       from: '"Autumhire Job Alerts" <jobalerts@autumhire.com>',
       to: email,
@@ -124,8 +137,10 @@ app.post('/send-job-alert', async (req, res) => {
              </ul>
              <p>Thank you for subscribing!</p>`
     });
+    console.log('Subscription email sent successfully.');
     res.json({ success: true });
   } catch (err) {
+    console.error('Subscription error:', err);
     res.status(500).json({ error: err.message });
   }
 });
