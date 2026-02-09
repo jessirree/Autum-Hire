@@ -56,13 +56,21 @@ app.use(cors({
 }));
 
 // Nodemailer transporter for job alerts
+// Nodemailer transporter for job alerts
+const smtpPort = parseInt(process.env.SMTP_PORT) || 465;
+const isSecure = smtpPort === 465; // True for 465, false for 587
+
 const jobAlertsTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.autumhire.com',
-  port: parseInt(process.env.SMTP_PORT) || 465,
-  secure: true,
+  port: smtpPort,
+  secure: isSecure,
   auth: {
     user: process.env.JOB_ALERTS_EMAIL || 'jobalerts@autumhire.com',
     pass: process.env.JOB_ALERTS_PASSWORD
+  },
+  tls: {
+    // Determine if we need to accept self-signed certs (common for some cPanel hosts)
+    rejectUnauthorized: false
   }
 });
 
@@ -78,11 +86,14 @@ jobAlertsTransporter.verify(function (error, success) {
 // Nodemailer transporter for contact form (info@autumhire.com)
 const infoTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.autumhire.com',
-  port: parseInt(process.env.SMTP_PORT) || 465,
-  secure: true,
+  port: smtpPort,
+  secure: isSecure,
   auth: {
     user: process.env.INFO_EMAIL || 'info@autumhire.com',
     pass: process.env.INFO_EMAIL_PASSWORD
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
