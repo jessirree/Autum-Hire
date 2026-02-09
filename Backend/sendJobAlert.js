@@ -80,6 +80,11 @@ const infoTransporter = nodemailer.createTransport({
 // In-memory array to store subscribers
 const subscribers = [];
 
+// Root endpoint for health check
+app.get('/', (req, res) => {
+  res.send('Autumhire Backend is running!');
+});
+
 // Test endpoint to verify CORS is working
 app.get('/test', (req, res) => {
   console.log('Test endpoint called');
